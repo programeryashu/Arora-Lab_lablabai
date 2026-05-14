@@ -332,3 +332,4 @@ bootSequence();
 // feat: add support for rich text in log terminal
 // refactor: optimize agent task queueing logic
 // style: refine typography and information hierarchy
+// fix: prevent duplicate project triggers in UI
