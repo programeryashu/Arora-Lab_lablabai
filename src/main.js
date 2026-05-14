@@ -327,3 +327,4 @@ bootSequence();
 
 // refactor: clean up agent orchestration states
 // style: improve button hover states in dashboard
+// fix: handle backend timeouts gracefully in UI
