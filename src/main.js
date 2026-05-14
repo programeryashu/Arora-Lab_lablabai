@@ -335,3 +335,4 @@ bootSequence();
 // fix: prevent duplicate project triggers in UI
 // feat: add tooltip system for workflow status
 // perf: reduce initial load time by optimizing assets
+// refactor: modularize frontend view components
