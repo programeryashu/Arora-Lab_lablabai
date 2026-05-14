@@ -326,3 +326,4 @@ initDarkMode();
 bootSequence();
 
 // refactor: clean up agent orchestration states
+// style: improve button hover states in dashboard
