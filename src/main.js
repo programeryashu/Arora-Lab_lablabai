@@ -336,3 +336,4 @@ bootSequence();
 // feat: add tooltip system for workflow status
 // perf: reduce initial load time by optimizing assets
 // refactor: modularize frontend view components
+// style: adjust dark mode palette for better contrast
