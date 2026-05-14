@@ -330,3 +330,4 @@ bootSequence();
 // fix: handle backend timeouts gracefully in UI
 // docs: clarify API response structures in docs
 // feat: add support for rich text in log terminal
+// refactor: optimize agent task queueing logic
