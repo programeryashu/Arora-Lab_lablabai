@@ -324,3 +324,5 @@ function initApp() {
 // ═══════════════════════════════════════════════
 initDarkMode();
 bootSequence();
+
+// refactor: clean up agent orchestration states
