@@ -352,3 +352,4 @@ bootSequence();
 // style: finalize grid layout for ultrawide monitors
 // fix: resolve layout shift on mobile devices
 // feat: add search filter to execution history
+// refactor: consolidate shared styles in main.css
