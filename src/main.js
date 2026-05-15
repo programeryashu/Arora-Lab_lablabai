@@ -338,3 +338,4 @@ bootSequence();
 // refactor: modularize frontend view components
 // style: adjust dark mode palette for better contrast
 // fix: scroll to bottom automatically in log stream
+// feat: add export functionality for generated code
