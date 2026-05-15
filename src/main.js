@@ -353,3 +353,4 @@ bootSequence();
 // fix: resolve layout shift on mobile devices
 // feat: add search filter to execution history
 // refactor: consolidate shared styles in main.css
+// perf: optimize memory usage during long runs
