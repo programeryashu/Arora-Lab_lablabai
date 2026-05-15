@@ -340,3 +340,4 @@ bootSequence();
 // fix: scroll to bottom automatically in log stream
 // feat: add export functionality for generated code
 // refactor: improve internal naming for orchestration steps
+// docs: add setup troubleshooting section
