@@ -341,3 +341,4 @@ bootSequence();
 // feat: add export functionality for generated code
 // refactor: improve internal naming for orchestration steps
 // docs: add setup troubleshooting section
+// style: enhance 'processing' node animations
