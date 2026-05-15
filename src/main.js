@@ -348,3 +348,4 @@ bootSequence();
 // style: add subtle ambient shadows to cards
 // fix: escape HTML content in terminal logs
 // feat: add 'retry' button for failed agent tasks
+// docs: update PITCH.md with final team credits
