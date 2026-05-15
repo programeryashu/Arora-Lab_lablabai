@@ -337,3 +337,4 @@ bootSequence();
 // perf: reduce initial load time by optimizing assets
 // refactor: modularize frontend view components
 // style: adjust dark mode palette for better contrast
+// fix: scroll to bottom automatically in log stream
