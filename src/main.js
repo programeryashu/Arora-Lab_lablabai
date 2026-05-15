@@ -342,3 +342,4 @@ bootSequence();
 // refactor: improve internal naming for orchestration steps
 // docs: add setup troubleshooting section
 // style: enhance 'processing' node animations
+// fix: handle network interruptions in websocket
