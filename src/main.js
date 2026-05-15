@@ -345,3 +345,4 @@ bootSequence();
 // fix: handle network interruptions in websocket
 // feat: add keyboard shortcuts for dashboard navigation
 // refactor: unify backend error response format
+// style: add subtle ambient shadows to cards
