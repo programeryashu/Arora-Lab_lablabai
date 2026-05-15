@@ -350,3 +350,4 @@ bootSequence();
 // feat: add 'retry' button for failed agent tasks
 // docs: update PITCH.md with final team credits
 // style: finalize grid layout for ultrawide monitors
+// fix: resolve layout shift on mobile devices
