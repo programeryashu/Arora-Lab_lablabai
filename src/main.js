@@ -347,3 +347,4 @@ bootSequence();
 // refactor: unify backend error response format
 // style: add subtle ambient shadows to cards
 // fix: escape HTML content in terminal logs
+// feat: add 'retry' button for failed agent tasks
