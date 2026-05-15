@@ -343,3 +343,4 @@ bootSequence();
 // docs: add setup troubleshooting section
 // style: enhance 'processing' node animations
 // fix: handle network interruptions in websocket
+// feat: add keyboard shortcuts for dashboard navigation
