@@ -346,3 +346,4 @@ bootSequence();
 // feat: add keyboard shortcuts for dashboard navigation
 // refactor: unify backend error response format
 // style: add subtle ambient shadows to cards
+// fix: escape HTML content in terminal logs
