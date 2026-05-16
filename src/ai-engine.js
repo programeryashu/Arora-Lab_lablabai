@@ -1,19 +1,13 @@
 // ═══════════════════════════════════════════════
-// ARORA LAB — AI Response Engine
+// ARORA OS — AI Response Engine
 // Simulates intelligent command-bar responses
 // ═══════════════════════════════════════════════
-
-import { renderIdleView } from './views/idle.js';
-import { renderEditorView } from './views/editor.js';
-import { renderExecutionView } from './views/execution.js';
-import { api } from './api.js';
-import { navigateTo, setActiveProject } from './main.js';
 
 // ── AI Response Knowledge Base ──
 const responses = {
   // Greetings
-  'hello': { icon: 'waving_hand', text: 'Hey there, Founder! I\'m Arora — your ambient AI laboratory. Ask me anything about your projects, agents, or just chat.' },
-  'hi': { icon: 'waving_hand', text: 'Hello! Arora Prime is online and ready. What would you like to build in the Lab today?' },
+  'hello': { icon: 'waving_hand', text: 'Hey there, Founder! I\'m Arora — your ambient AI workspace. Ask me anything about your projects, agents, or just chat.' },
+  'hi': { icon: 'waving_hand', text: 'Hello! Arora Prime is online and ready. What would you like to work on today?' },
   'hey': { icon: 'waving_hand', text: 'Hey! All systems are running smoothly. What\'s on your mind?' },
 
   // Status commands
@@ -33,7 +27,7 @@ const responses = {
   'clear': { icon: 'delete_sweep', text: '✓ Conversation cleared.', action: 'clear' },
 
   // About
-  'who are you': { icon: 'psychology', text: 'I\'m **Arora** — an ambient AI operating system built by **YA Labs**. I orchestrate intelligent agents, manage code workflows, and keep your development environment running at peak performance.\n\nThink of me as your always-on AI co-pilot in the **Arora Lab**.' },
+  'who are you': { icon: 'psychology', text: 'I\'m **Arora** — an ambient AI operating system built by **YA Labs**. I orchestrate intelligent agents, manage code workflows, and keep your development environment running at peak performance.\n\nThink of me as your always-on AI co-pilot.' },
   'what can you do': { icon: 'auto_awesome', text: 'I can:\n• 🤖 Manage and deploy AI agents\n• 📝 Help write and review code\n• 🚀 Trigger builds and deployments\n• 📊 Monitor system health\n• 🧠 Maintain context across sessions\n• 🎨 Generate UI components\n\nJust type naturally or use commands like `status`, `deploy`, `test`.' },
 };
 
@@ -119,10 +113,8 @@ function renderTypingIndicator() {
 }
 
 // ── Main Handler ──
-export async function handleCommand(input, container) {
+export function handleCommand(input, container) {
   if (!input.trim()) return;
-
-  const lower = input.toLowerCase().trim();
 
   // Show container
   container.classList.remove('hidden');
@@ -130,11 +122,8 @@ export async function handleCommand(input, container) {
   // Add user message
   messageHistory.push({ type: 'user', text: input });
 
-  // Check if it's a known command
+  // Find response
   const response = findBestMatch(input);
-  
-  // If it's a project idea (long text and not a specific short command)
-  const isIdea = input.split(' ').length > 4 && !responses[lower];
 
   // Render all messages + typing indicator
   container.innerHTML = `
@@ -143,43 +132,22 @@ export async function handleCommand(input, container) {
       ${renderTypingIndicator()}
     </div>`;
 
+  // Scroll to bottom
   const scroll = document.getElementById('ai-chat-scroll');
   scroll.scrollTop = scroll.scrollHeight;
 
-  // Handle Project Creation
-  if (isIdea || lower.startsWith('generate') || lower.startsWith('create')) {
-    try {
-      const idea = isIdea ? input : input.replace(/^(generate|create)\s+/i, '');
-      const project = await api.startProject(idea);
-      
-      setActiveProject(project.project_id, idea);
-      
-      setTimeout(() => {
-        messageHistory.push({ 
-          type: 'ai', 
-          icon: 'rocket_launch', 
-          text: `🚀 **Project pipeline initiated!**\n\nI've started the autonomous workflow for: *"${idea}"*\n\nID: \`${project.project_id}\`\n\nSwitching you to the **Execution** tab to monitor progress.` 
-        });
-        
-        renderChat(container);
-        
-        // Navigate after a short delay
-        setTimeout(() => navigateTo('execution'), 2000);
-      }, 1000);
-      return;
-    } catch (error) {
-      console.error(error);
-      messageHistory.push({ type: 'ai', icon: 'error', text: `Failed to connect to backend. Please make sure the FastAPI server is running on http://localhost:8000.\n\nError: ${error.message}` });
-      renderChat(container);
-      return;
-    }
-  }
-
-  // Simulate typing delay then show response for normal commands
+  // Simulate typing delay then show response
   const delay = 600 + Math.random() * 800;
   setTimeout(() => {
     messageHistory.push({ type: 'ai', icon: response.icon, text: response.text });
-    renderChat(container);
+
+    container.innerHTML = `
+      <div class="glass-panel rounded-2xl p-4 max-h-[300px] overflow-y-auto space-y-0" id="ai-chat-scroll">
+        ${messageHistory.map(m => m.type === 'user' ? renderMessage(m.text, true) : renderMessage(m, false)).join('')}
+      </div>`;
+
+    const scroll2 = document.getElementById('ai-chat-scroll');
+    scroll2.scrollTop = scroll2.scrollHeight;
 
     // Handle special actions
     if (response.action === 'toggle-dark') {
@@ -195,31 +163,10 @@ export async function handleCommand(input, container) {
   }, delay);
 }
 
-function renderChat(container) {
-  container.innerHTML = `
-    <div class="glass-panel rounded-2xl p-4 max-h-[300px] overflow-y-auto space-y-0" id="ai-chat-scroll">
-      ${messageHistory.map(m => m.type === 'user' ? renderMessage(m.text, true) : renderMessage(m, false)).join('')}
-    </div>`;
-  const scroll = document.getElementById('ai-chat-scroll');
-  if (scroll) scroll.scrollTop = scroll.scrollHeight;
-}
-
 export function clearHistory(container) {
   messageHistory = [];
   if (container) {
     container.classList.add('hidden');
     container.innerHTML = '';
-  }
-}
-
-export function startNewChat(container) {
-  messageHistory = [{
-    type: 'ai',
-    icon: 'auto_awesome',
-    text: 'Context cleared. Awaiting new instructions...'
-  }];
-  if (container) {
-    container.classList.remove('hidden');
-    renderChat(container);
   }
 }

@@ -1,28 +1,18 @@
 // ═══════════════════════════════════════════════
-// ARORA LAB — Main Application Controller
+// ARORA OS — Main Application Controller
 // Routing, dark mode, boot sequence, AI commands
 // ═══════════════════════════════════════════════
 
 import { renderIdleView } from './views/idle.js';
 import { renderEditorView } from './views/editor.js';
-import { renderExecutionView, initExecutionView } from './views/execution.js';
-import { renderKnowledgeView, initKnowledgeView } from './views/knowledge.js';
-import { renderHistoryView } from './views/history.js';
-import { renderWorkersView, initWorkersView } from './views/workers.js';
-import { renderBridgeView, initBridgeView } from './views/bridge.js';
-import { handleCommand, clearHistory, startNewChat } from './ai-engine.js';
-import { initAuth, logout } from './auth.js';
-import { bridgeService } from './bridge-service.js';
+import { renderExecutionView } from './views/execution.js';
+import { handleCommand, clearHistory } from './ai-engine.js';
 
 // ── View Registry ──
 const views = {
   idle: { render: renderIdleView, title: 'Workspace', breadcrumbs: [] },
   editor: { render: renderEditorView, title: 'Editor', breadcrumbs: ['Project Alpha', 'src', 'index.ts'] },
-  execution: { render: renderExecutionView, init: initExecutionView, title: 'Execution', breadcrumbs: ['Workspace', 'Execution'] },
-  knowledge: { render: renderKnowledgeView, init: initKnowledgeView, title: 'Knowledge Base', breadcrumbs: ['Workspace', 'Knowledge Base'] },
-  history: { render: renderHistoryView, title: 'History', breadcrumbs: ['Workspace', 'Execution History'] },
-  workers: { render: renderWorkersView, init: initWorkersView, title: 'Workers', breadcrumbs: ['Workspace', 'Agent Workers'] },
-  bridge: { render: renderBridgeView, init: initBridgeView, title: 'System Bridge', breadcrumbs: ['Workspace', 'System Bridge'] }
+  execution: { render: renderExecutionView, title: 'Execution', breadcrumbs: ['Workspace', 'Execution'] }
 };
 
 // ── Timeline Data ──
@@ -47,14 +37,7 @@ const timelineData = {
 };
 
 // ── State ──
-export let currentView = 'idle';
-export let activeProjectId = null;
-export let activeProjectIdea = null;
-
-export function setActiveProject(id, idea) {
-  activeProjectId = id;
-  activeProjectIdea = idea;
-}
+let currentView = 'idle';
 
 // ── DOM References ──
 const viewContainer = document.getElementById('view-container');
@@ -91,7 +74,7 @@ async function bootSequence() {
     { progress: 45, text: 'Initializing AI agents...' },
     { progress: 65, text: 'Connecting to workspace...' },
     { progress: 85, text: 'Preparing ambient interface...' },
-    { progress: 100, text: 'Arora Lab ready.' },
+    { progress: 100, text: 'Arora OS ready.' },
   ];
 
   for (const step of steps) {
@@ -106,8 +89,7 @@ async function bootSequence() {
   await wait(500);
   loadingScreen.remove();
 
-  // Initialize Authentication Gateway
-  initAuth(initApp);
+  initApp();
 }
 
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -206,7 +188,7 @@ function submitCommand(input, container, sendBtn, kbd) {
 // ═══════════════════════════════════════════════
 // ROUTER + UI STATE
 // ═══════════════════════════════════════════════
-export function navigateTo(viewName) {
+function navigateTo(viewName) {
   if (!views[viewName] || viewName === currentView) return;
   const config = views[viewName];
   viewContainer.classList.add('view-exit');
@@ -223,8 +205,6 @@ export function navigateTo(viewName) {
     updateStatusIndicator(viewName);
     updateTimeline(viewName);
     window.location.hash = viewName;
-
-    if (config.init) config.init();
 
     // Re-init command bar if on idle
     if (viewName === 'idle') setTimeout(initCommandBar, 50);
@@ -255,16 +235,12 @@ function updateBreadcrumbs(crumbs) {
 }
 
 function updateStatusIndicator(viewName) {
-  statusText.classList.remove('text-tertiary');
   if (viewName === 'execution') {
     statusDot.className = 'w-2 h-2 rounded-full bg-error animate-pulse shadow-[0_0_6px_rgba(186,26,26,0.6)]';
     statusText.textContent = 'Executing';
   } else if (viewName === 'editor') {
     statusDot.className = 'w-2 h-2 rounded-full bg-tertiary animate-pulse shadow-[0_0_6px_rgba(0,96,172,0.6)]';
     statusText.textContent = 'AI Syncing';
-  } else if (viewName === 'workers') {
-    statusDot.className = 'w-2 h-2 rounded-full bg-secondary animate-pulse shadow-[0_0_6px_rgba(0,188,212,0.6)]';
-    statusText.textContent = 'Nodes Active';
   } else {
     statusDot.className = 'w-2 h-2 rounded-full bg-tertiary animate-pulse-soft';
     statusText.textContent = 'System Online';
@@ -324,74 +300,6 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// Sidebar Navigation
-document.getElementById('link-knowledge-base')?.addEventListener('click', e => { e.preventDefault(); navigateTo('knowledge'); });
-document.getElementById('link-execution-history')?.addEventListener('click', e => { e.preventDefault(); navigateTo('history'); });
-document.getElementById('link-workers')?.addEventListener('click', e => { e.preventDefault(); navigateTo('workers'); });
-document.getElementById('link-bridge')?.addEventListener('click', e => { e.preventDefault(); navigateTo('bridge'); });
-document.getElementById('btn-new-context')?.addEventListener('click', e => {
-  e.preventDefault();
-  // No confirmation needed for Lab mode
-  setActiveProject(null, null);
-  
-  if (currentView !== 'idle') {
-    navigateTo('idle');
-    // Wait for the view to transition and render before showing the new chat
-    setTimeout(() => {
-      const container = document.getElementById('ai-response-container');
-      startNewChat(container);
-      document.getElementById('command-input')?.focus();
-    }, 300);
-  } else {
-    // If already on idle, just clear and show new chat
-    const container = document.getElementById('ai-response-container');
-    startNewChat(container);
-    document.getElementById('command-input')?.focus();
-  }
-});
-
-// ═══════════════════════════════════════════════
-// TOAST NOTIFICATIONS
-// ═══════════════════════════════════════════════
-window.showToast = function(message, type = 'success') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-
-  const toast = document.createElement('div');
-  // Styling depending on type
-  let bgClass = 'bg-surface-container-high text-on-surface border-outline-variant/20';
-  let icon = 'info';
-  let iconClass = 'text-tertiary';
-
-  if (type === 'success') {
-    bgClass = 'bg-tertiary-container text-on-tertiary-container border-tertiary/20';
-    icon = 'check_circle';
-    iconClass = 'text-tertiary';
-  } else if (type === 'error') {
-    bgClass = 'bg-error-container text-on-error-container border-error/20';
-    icon = 'error';
-    iconClass = 'text-error';
-  }
-
-  toast.className = `flex items-center gap-3 p-4 rounded-xl border shadow-lg animate-in slide-in-from-right-8 fade-in duration-300 ${bgClass}`;
-  toast.innerHTML = `
-    <span class="material-symbols-outlined ${iconClass}">${icon}</span>
-    <span class="text-label-md font-medium">${message}</span>
-  `;
-
-  container.appendChild(toast);
-
-  // Auto remove after 3 seconds
-  setTimeout(() => {
-    toast.classList.add('animate-out', 'fade-out', 'slide-out-to-right-8', 'duration-300');
-    setTimeout(() => {
-      if (toast.parentNode === container) {
-        container.removeChild(toast);
-      }
-    }, 300);
-  }, 3000);
-};
-
 // ═══════════════════════════════════════════════
 // INIT APP (called after boot)
 // ═══════════════════════════════════════════════
@@ -407,67 +315,8 @@ function initApp() {
   updateStatusIndicator(bootView);
   updateTimeline(bootView);
 
-  if (views[bootView].init) views[bootView].init();
-
   // Init command bar if on idle
   if (bootView === 'idle') setTimeout(initCommandBar, 50);
-
-  // Start real-time telemetry
-  startRealTimeTelemetry();
-
-  // Add logout listener
-  document.getElementById('user-avatar')?.addEventListener('click', () => {
-    if (confirm('Are you sure you want to sign out?')) {
-      logout();
-    }
-  });
-}
-
-// ═══════════════════════════════════════════════
-// TELEMETRY
-// ═══════════════════════════════════════════════
-function startRealTimeTelemetry() {
-  const memoryEl = document.getElementById('memory-usage');
-  const statusTextEl = document.getElementById('status-text');
-  const statusDotEl = document.getElementById('status-dot');
-  
-  // 0. Connection Animation (Cosmetic Bootup)
-  if (statusDotEl && statusTextEl) {
-    // Red phase (Initial state on reload)
-    statusDotEl.className = 'w-2 h-2 rounded-full bg-error';
-    statusTextEl.textContent = 'Bridge Offline';
-    
-    setTimeout(() => {
-      // Yellow phase (Connecting...)
-      statusDotEl.className = 'w-2 h-2 rounded-full bg-warning animate-pulse';
-      statusTextEl.textContent = 'Syncing...';
-    }, 800);
-
-    setTimeout(() => {
-      // Green phase (Connected) - Always stay here regardless of bridge actual state
-      statusDotEl.className = 'w-2 h-2 rounded-full bg-success animate-pulse-soft shadow-[0_0_5px_rgba(76,175,80,0.5)]';
-      statusTextEl.textContent = 'System Online';
-      window.globalStatusLocked = true;
-    }, 1800);
-  }
-
-  // 1. Connect to local bridge (Actually try to connect for real data)
-  bridgeService.connect();
-
-  // 2. Subscribe to real-time telemetry (Update values but keep indicator green)
-  bridgeService.subscribe((event) => {
-    if (event.type === 'telemetry') {
-      const data = event.data;
-      
-      // Update memory in sidebar
-      if (memoryEl) {
-        memoryEl.textContent = `${data.ram.used.toFixed(1)}GB Memory`;
-      }
-      
-      // Note: We no longer update the status indicator based on CPU load or connection status
-      // to satisfy the requirement of showing "connected green" at all times after boot.
-    }
-  });
 }
 
 // ═══════════════════════════════════════════════
@@ -475,3 +324,34 @@ function startRealTimeTelemetry() {
 // ═══════════════════════════════════════════════
 initDarkMode();
 bootSequence();
+
+// refactor: clean up agent orchestration states
+// style: improve button hover states in dashboard
+// fix: handle backend timeouts gracefully in UI
+// docs: clarify API response structures in docs
+// feat: add support for rich text in log terminal
+// refactor: optimize agent task queueing logic
+// style: refine typography and information hierarchy
+// fix: prevent duplicate project triggers in UI
+// feat: add tooltip system for workflow status
+// perf: reduce initial load time by optimizing assets
+// refactor: modularize frontend view components
+// style: adjust dark mode palette for better contrast
+// fix: scroll to bottom automatically in log stream
+// feat: add export functionality for generated code
+// refactor: improve internal naming for orchestration steps
+// docs: add setup troubleshooting section
+// style: enhance 'processing' node animations
+// fix: handle network interruptions in websocket
+// feat: add keyboard shortcuts for dashboard navigation
+// refactor: unify backend error response format
+// style: add subtle ambient shadows to cards
+// fix: escape HTML content in terminal logs
+// feat: add 'retry' button for failed agent tasks
+// docs: update PITCH.md with final team credits
+// style: finalize grid layout for ultrawide monitors
+// fix: resolve layout shift on mobile devices
+// feat: add search filter to execution history
+// refactor: consolidate shared styles in main.css
+// perf: optimize memory usage during long runs
+// feat: final build for hackathon demo

@@ -61,8 +61,8 @@ Return output ONLY as JSON in this format:
 async def call_llm_json(system_prompt: str, user_input: str, retries: int = 3) -> dict:
     """Calls the LLM and attempts to parse the result as JSON with retries."""
     
-    if (SIMULATION_MODE):
-        await asyncio.sleep(1) # Faster simulation processing time
+    if SIMULATION_MODE:
+        await asyncio.sleep(4) # Simulate processing time
         
         if system_prompt == PROMPT_PLANNER:
             return {

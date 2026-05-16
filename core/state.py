@@ -33,7 +33,7 @@ def add_progress(project_id: str, message: str):
         # Broadcast to active websocket connections
         if project_id in CONNECTIONS:
             for ws in CONNECTIONS[project_id]:
-                asyncio.create_task(ws.send_json({"log": message, "current_agent": STATE[project_id]["current_agent"]}))
+                asyncio.create_task(ws.send_json({"logs": STATE[project_id]["progress"], "current_agent": STATE[project_id]["current_agent"]}))
 
 def set_result(project_id: str, key: str, data: Any):
     if project_id in STATE:

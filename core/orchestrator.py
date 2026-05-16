@@ -9,7 +9,7 @@ from .agents import (
 async def run_workflow(project_id: str, user_idea: str):
     try:
         create_project(project_id)
-        add_progress(project_id, f"🚀 Starting workflow for idea: {user_idea}")
+        add_progress(project_id, f"[*] Starting workflow for idea: {user_idea}")
         
         # 1. Planner Agent
         update_agent(project_id, "planner")
@@ -17,21 +17,21 @@ async def run_workflow(project_id: str, user_idea: str):
         planner_input = json.dumps({"idea": user_idea})
         planner_output = await call_llm_json(PROMPT_PLANNER, planner_input)
         set_result(project_id, "planner", planner_output)
-        add_progress(project_id, "✅ Planner completed successfully.")
+        add_progress(project_id, "[SUCCESS] Planner completed successfully.")
         
         # 2. Frontend Agent
         update_agent(project_id, "frontend")
         add_progress(project_id, "Frontend engineer is generating UI code...")
         frontend_output = await call_llm_json(PROMPT_FRONTEND, json.dumps(planner_output))
         set_result(project_id, "frontend", frontend_output)
-        add_progress(project_id, "✅ Frontend code generated.")
+        add_progress(project_id, "[SUCCESS] Frontend code generated.")
         
         # 3. Backend Agent
         update_agent(project_id, "backend")
         add_progress(project_id, "Backend engineer is designing APIs and DB schema...")
         backend_output = await call_llm_json(PROMPT_BACKEND, json.dumps(planner_output))
         set_result(project_id, "backend", backend_output)
-        add_progress(project_id, "✅ Backend code generated.")
+        add_progress(project_id, "[SUCCESS] Backend code generated.")
         
         # 4. Docs Agent
         update_agent(project_id, "docs")
@@ -43,14 +43,14 @@ async def run_workflow(project_id: str, user_idea: str):
         })
         docs_output = await call_llm_json(PROMPT_DOCS, docs_input)
         set_result(project_id, "docs", docs_output)
-        add_progress(project_id, "✅ Documentation generated.")
+        add_progress(project_id, "[SUCCESS] Documentation generated.")
         
         # Complete
         finish_project(project_id)
-        add_progress(project_id, "🎉 Pipeline Complete!")
+        add_progress(project_id, "[DONE] Pipeline Complete!")
         
     except Exception as e:
         update_agent(project_id, "error")
-        add_progress(project_id, f"❌ Pipeline failed: {str(e)}")
+        add_progress(project_id, f"[ERROR] Pipeline failed: {str(e)}")
 
 
