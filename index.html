@@ -3,14 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Arora OS — AI-Powered Ambient Workspace</title>
-  <meta name="description" content="Arora OS by YA Labs — An ambient AI workspace for orchestrating intelligent agents, editing code, and executing workflows." />
+  <title>Arora Lab — AI-Native Ambient Lab</title>
+  <meta name="description" content="Arora Lab by YA Labs — An ambient AI workspace for orchestrating intelligent agents, editing code, and executing workflows." />
 
   <!-- Favicon (inline SVG) -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230060ac'/%3E%3Cpath d='M16 5L6 27h4l2-4h8l2 4h4L16 5z' fill='none' stroke='white' stroke-width='1.8'/%3E%3Cpath d='M13 19h6l-3-6-3 6z' fill='white' opacity='0.5'/%3E%3C/svg%3E" />
 
   <!-- Tailwind CSS (matching Stitch design system) -->
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+  <!-- JSZip Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <!-- Manrope Font -->
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -112,6 +115,7 @@
 
   <!-- App Styles -->
   <link rel="stylesheet" href="/src/styles/main.css" />
+  <link rel="stylesheet" href="/src/styles/auth.css" />
 </head>
 <body class="text-on-background h-screen overflow-hidden flex flex-col relative bg-background">
 
@@ -125,13 +129,133 @@
       </svg>
     </div>
     <div class="text-center relative z-10 mb-6">
-      <h1 class="text-headline-md text-on-surface font-bold tracking-tight">Arora OS</h1>
-      <p class="text-label-sm text-on-surface-variant mt-1 tracking-widest uppercase">Initializing Workspace</p>
+      <h1 class="text-headline-md text-on-surface font-bold tracking-tight">Arora Lab</h1>
+      <p class="text-label-sm text-on-surface-variant mt-1 tracking-widest uppercase">Initializing Laboratory</p>
     </div>
     <div class="w-48 h-1 bg-surface-container-high rounded-full overflow-hidden relative z-10">
       <div id="boot-progress" class="h-full bg-tertiary rounded-full transition-all duration-700" style="width:0%"></div>
     </div>
     <p id="boot-status" class="text-label-sm text-on-surface-variant mt-3 relative z-10 font-mono">Loading modules...</p>
+  </div>
+
+  <!-- ═══════════ AUTHENTICATION SCREEN ═══════════ -->
+  <div id="auth-screen" class="fixed inset-0 z-[9000] flex flex-col items-center justify-center bg-background hidden">
+    <div class="auth-card">
+      <!-- Left: Brand -->
+      <div class="auth-brand">
+        <div class="brand-logo-container">
+          <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+            <svg class="w-6 h-6 text-[#0060ac]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M12 2L2 22h5l2-4h6l2 4h5L12 2z"></path>
+              <path d="M10 14h4l-2-4-2 4z"></path>
+            </svg>
+          </div>
+          <span class="text-xl font-bold tracking-tighter">Arora Lab</span>
+        </div>
+        
+        <div class="brand-intro">
+          <h2>Build, collaborate, and create with AI agents</h2>
+          <p>Enter the next generation of intelligent workflows. Your personal laboratory for agent orchestration awaits.</p>
+        </div>
+
+        <div class="brand-footer">
+          &copy; 2026 YA Labs. All rights reserved.
+        </div>
+      </div>
+
+      <!-- Right: Form -->
+      <div class="auth-form-container">
+        <div class="auth-tabs">
+          <div class="auth-tab active" data-tab="login">Login</div>
+          <div class="auth-tab" data-tab="signup">Sign Up</div>
+        </div>
+
+        <!-- Login View -->
+        <div id="login-view" class="auth-view active">
+          <form id="login-form">
+            <div class="input-group">
+              <label class="input-label">Email Address</label>
+              <div class="input-wrapper">
+                <input type="email" required class="input-field" placeholder="name@example.com">
+              </div>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Password</label>
+              <div class="input-wrapper">
+                <input type="password" required class="input-field" placeholder="••••••••" id="login-password">
+                <span class="material-symbols-outlined input-icon toggle-password" data-target="login-password">visibility</span>
+              </div>
+            </div>
+            <div class="form-extras">
+              <label class="checkbox-group">
+                <input type="checkbox">
+                <span>Remember me</span>
+              </label>
+              <a href="#" class="forgot-link">Forgot password?</a>
+            </div>
+            <button type="submit" class="btn-primary group">
+              <span>Enter Workspace</span>
+              <span class="material-symbols-outlined text-[20px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Signup View -->
+        <div id="signup-view" class="auth-view">
+          <form id="signup-form">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="input-group">
+                <label class="input-label">Full Name</label>
+                <input type="text" required class="input-field" placeholder="John Doe">
+              </div>
+              <div class="input-group">
+                <label class="input-label">Role</label>
+                <select class="input-field cursor-pointer">
+                  <option>Developer</option>
+                  <option>Researcher</option>
+                  <option>Product Manager</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Email Address</label>
+              <input type="email" required class="input-field" placeholder="name@example.com">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="input-group">
+                <label class="input-label">Password</label>
+                <input type="password" required class="input-field" placeholder="••••••••" id="signup-password">
+              </div>
+              <div class="input-group">
+                <label class="input-label">Confirm</label>
+                <input type="password" required class="input-field" placeholder="••••••••">
+              </div>
+            </div>
+            <button type="submit" class="btn-primary mt-4 group">
+              <span>Create Account</span>
+              <span class="material-symbols-outlined text-[20px] group-hover:translate-x-1 transition-transform">verified_user</span>
+            </button>
+          </form>
+        </div>
+
+        <div class="relative my-8">
+          <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-neutral-100"></div></div>
+          <div class="relative flex justify-center text-xs uppercase"><span class="bg-white px-2 text-slate-400 font-bold">Or continue with</span></div>
+        </div>
+
+        <div class="social-login">
+          <button class="btn-social">
+            <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google">
+            <span>Google</span>
+          </button>
+          <button class="btn-social">
+            <img src="https://www.svgrepo.com/show/512317/github-142.svg" class="w-5 h-5" alt="GitHub">
+            <span>GitHub</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ═══════════ ATMOSPHERIC BACKGROUND ═══════════ -->
@@ -166,7 +290,7 @@
           </svg>
         </div>
         <div class="flex flex-col leading-none">
-          <span class="font-bold text-[14px] text-on-surface tracking-tight">Arora OS</span>
+          <span class="font-bold text-[14px] text-on-surface tracking-tight">Arora Lab</span>
           <span class="text-[10px] text-on-surface-variant font-medium">by YA Labs</span>
         </div>
       </div>
@@ -198,7 +322,7 @@
       </button>
 
       <!-- Avatar -->
-      <div class="w-8 h-8 rounded-full bg-tertiary-container border border-outline-variant/30 overflow-hidden flex items-center justify-center shadow-sm">
+      <div id="user-avatar" class="w-8 h-8 rounded-full bg-tertiary-container border border-outline-variant/30 overflow-hidden flex items-center justify-center shadow-sm cursor-pointer hover:ring-2 hover:ring-tertiary/20 transition-all">
         <span class="material-symbols-outlined text-tertiary text-[18px]">person</span>
       </div>
     </div>
@@ -219,11 +343,12 @@
           <div>
             <h2 class="text-[14px] font-bold text-on-surface leading-tight">Project Alpha</h2>
             <p class="text-label-sm text-on-surface-variant font-normal flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> 4.2GB Memory
+              <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> 
+              <span id="memory-usage">4.2GB Memory</span>
             </p>
           </div>
         </div>
-        <button class="w-full bg-surface-container text-on-surface py-2.5 px-4 rounded-xl text-label-md hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2 border border-outline-variant/20 shadow-sm">
+        <button id="btn-new-context" class="w-full bg-surface-container text-on-surface py-2.5 px-4 rounded-xl text-label-md hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2 border border-outline-variant/20 shadow-sm">
           <span class="material-symbols-outlined text-[18px]">add</span>
           New Context
         </button>
@@ -238,12 +363,12 @@
             <span class="material-symbols-outlined text-[16px] transition-transform">expand_more</span>
           </button>
           <div class="pl-2 mt-1 space-y-1">
-            <a href="#" class="sidebar-item flex items-center gap-3 px-3 py-2 bg-secondary-container/50 text-on-secondary-container rounded-xl text-[13px] font-medium border border-secondary/10">
+            <a href="#" data-view="idle" class="sidebar-item flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-xl text-[13px] font-medium">
               <span class="w-2 h-2 rounded-full bg-tertiary"></span>
               <span class="material-symbols-outlined text-[18px]">folder_open</span>
               Explorer
             </a>
-            <a href="#" class="sidebar-item flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-xl text-[13px] font-medium">
+            <a href="#" id="link-knowledge-base" data-view="knowledge" class="sidebar-item flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-xl text-[13px] font-medium">
               <span class="w-2 h-2 rounded-full bg-outline-variant"></span>
               <span class="material-symbols-outlined text-[18px]">psychology</span>
               Knowledge Base
@@ -258,12 +383,17 @@
             <span class="material-symbols-outlined text-[16px]">expand_more</span>
           </button>
           <div class="pl-2 mt-1 space-y-1">
-            <a href="#" class="sidebar-item flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-xl text-[13px] font-medium">
-              <span class="w-2 h-2 rounded-full bg-secondary"></span>
-              <span class="material-symbols-outlined text-[18px]">smart_toy</span>
-              Workers
+            <a href="#" id="link-workers" data-view="workers" class="sidebar-item flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-xl text-[13px] font-medium">
+              <span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+              <span class="material-symbols-outlined text-[18px]">engineering</span>
+              Agent Workers
             </a>
-            <a href="#" class="sidebar-item flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-xl text-[13px] font-medium">
+            <a href="#" id="link-bridge" data-view="bridge" class="sidebar-item flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-xl text-[13px] font-medium">
+              <span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+              <span class="material-symbols-outlined text-[18px]">dns</span>
+              System Bridge
+            </a>
+            <a href="#" id="link-execution-history" data-view="history" class="sidebar-item flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-xl text-[13px] font-medium">
               <span class="w-2 h-2 rounded-full bg-outline-variant"></span>
               <span class="material-symbols-outlined text-[18px]">history</span>
               Execution History
@@ -328,6 +458,57 @@
 
   <!-- Mobile Sidebar Overlay -->
   <div id="sidebar-overlay" class="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 hidden md:hidden transition-opacity"></div>
+
+  <!-- ═══════════ WORKERS MODAL ═══════════ -->
+  <div id="worker-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" id="worker-modal-overlay"></div>
+    <div class="glass-panel w-full max-w-lg rounded-3xl p-8 relative z-10 shadow-2xl border border-outline-variant/30 animate-in fade-in zoom-in duration-300">
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-tertiary-container flex items-center justify-center text-tertiary">
+            <span class="material-symbols-outlined">person_add</span>
+          </div>
+          <h2 class="text-headline-md text-on-surface font-bold">New Arora Worker</h2>
+        </div>
+        <button id="close-worker-modal" class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50 rounded-lg transition-all">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form id="worker-form" class="space-y-4">
+        <div>
+          <label class="block text-label-sm text-on-surface-variant mb-1.5 font-bold uppercase tracking-wider">Worker Name</label>
+          <input type="text" id="worker-name" placeholder="e.g. Arora Scout" required
+            class="w-full bg-surface-container border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface focus:ring-2 focus:ring-tertiary/20 outline-none transition-all" />
+        </div>
+        <div>
+          <label class="block text-label-sm text-on-surface-variant mb-1.5 font-bold uppercase tracking-wider">Role</label>
+          <input type="text" id="worker-role" placeholder="e.g. Research Specialist" required
+            class="w-full bg-surface-container border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface focus:ring-2 focus:ring-tertiary/20 outline-none transition-all" />
+        </div>
+        <div>
+          <label class="block text-label-sm text-on-surface-variant mb-1.5 font-bold uppercase tracking-wider">Behavior Prompt (System Instructions)</label>
+          <textarea id="worker-prompt" placeholder="Define the boundaries and style of this worker..." required rows="4"
+            class="w-full bg-surface-container border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface focus:ring-2 focus:ring-tertiary/20 outline-none transition-all resize-none"></textarea>
+        </div>
+        <div>
+          <label class="block text-label-sm text-on-surface-variant mb-1.5 font-bold uppercase tracking-wider">API Key</label>
+          <input type="password" id="worker-api-key" placeholder="sk-..." required
+            class="w-full bg-surface-container border-outline-variant/20 rounded-xl px-4 py-3 text-on-surface focus:ring-2 focus:ring-tertiary/20 outline-none transition-all font-mono" />
+        </div>
+        
+        <div class="pt-4">
+          <button type="submit" class="w-full bg-tertiary text-on-tertiary py-4 px-6 rounded-2xl text-label-md font-bold hover:bg-on-tertiary-fixed-variant transition-all shadow-lg shadow-tertiary/20 flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined">verified</span>
+            Initialize Worker
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══════════ TOAST NOTIFICATIONS ═══════════ -->
+  <div id="toast-container" class="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[9999] flex flex-col gap-3 pointer-events-none"></div>
 
   <!-- App Scripts -->
   <script type="module" src="/src/main.js"></script>

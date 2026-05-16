@@ -32,7 +32,12 @@ Focus on clean and responsive design based on the provided planner output.
 
 Return output ONLY as JSON in this format:
 {
-  "frontend_code": "..."
+  "components": [
+    {
+      "name": "App.jsx",
+      "code": "..."
+    }
+  ]
 }
 """
 
@@ -61,8 +66,8 @@ Return output ONLY as JSON in this format:
 async def call_llm_json(system_prompt: str, user_input: str, retries: int = 3) -> dict:
     """Calls the LLM and attempts to parse the result as JSON with retries."""
     
-    if SIMULATION_MODE:
-        await asyncio.sleep(4) # Simulate processing time
+    if (SIMULATION_MODE):
+        await asyncio.sleep(1) # Faster simulation processing time
         
         if system_prompt == PROMPT_PLANNER:
             return {
@@ -96,20 +101,20 @@ async def call_llm_json(system_prompt: str, user_input: str, retries: int = 3) -
 
     if system_prompt == PROMPT_PLANNER:
         model_id = "mistralai/mistral-medium-3.5-128b"
-        api_key = os.getenv("PLANNER_API_KEY")
-        base_url = os.getenv("PLANNER_BASE_URL")
+        api_key = os.getenv("PLANNER_API_KEY") or os.getenv("VITE_PLANNER_API_KEY")
+        base_url = os.getenv("PLANNER_BASE_URL") or os.getenv("VITE_PLANNER_BASE_URL")
     elif system_prompt == PROMPT_FRONTEND:
         model_id = "moonshotai/kimi-k2.6"
-        api_key = os.getenv("FRONTEND_API_KEY")
-        base_url = os.getenv("FRONTEND_BASE_URL")
+        api_key = os.getenv("FRONTEND_API_KEY") or os.getenv("VITE_FRONTEND_API_KEY")
+        base_url = os.getenv("FRONTEND_BASE_URL") or os.getenv("VITE_FRONTEND_BASE_URL")
     elif system_prompt == PROMPT_BACKEND:
         model_id = "deepseek-ai/deepseek-v4-flash"
-        api_key = os.getenv("BACKEND_API_KEY")
-        base_url = os.getenv("BACKEND_BASE_URL")
+        api_key = os.getenv("BACKEND_API_KEY") or os.getenv("VITE_BACKEND_API_KEY")
+        base_url = os.getenv("BACKEND_BASE_URL") or os.getenv("VITE_BACKEND_BASE_URL")
     elif system_prompt == PROMPT_DOCS:
         model_id = "google/gemma-4-31b-it"
-        api_key = os.getenv("DOCS_API_KEY")
-        base_url = os.getenv("DOCS_BASE_URL")
+        api_key = os.getenv("DOCS_API_KEY") or os.getenv("VITE_DOCS_API_KEY")
+        base_url = os.getenv("DOCS_BASE_URL") or os.getenv("VITE_DOCS_BASE_URL")
 
     if not api_key:
         return {"error": f"API_KEY not set for {model_id}. Mock response returned.", "raw_input": user_input[:50]}
