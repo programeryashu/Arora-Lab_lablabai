@@ -9,7 +9,7 @@ CONNECTIONS: Dict[str, List[WebSocket]] = {}
 def create_project(project_id: str):
     STATE[project_id] = {
         "status": "running",
-        "current_agent": "Bob AI",
+        "current_agent": "idle",
         "progress": [f"Project {project_id} initialized."],
         "results": {
             "planner": None,
@@ -42,7 +42,7 @@ def set_result(project_id: str, key: str, data: Any):
 def finish_project(project_id: str):
     if project_id in STATE:
         STATE[project_id]["status"] = "completed"
-        STATE[project_id]["current_agent"] = "done"
+        STATE[project_id]["current_agent"] = "completed"
 
 def get_project(project_id: str) -> Dict[str, Any]:
     return STATE.get(project_id)
@@ -55,8 +55,7 @@ async def connect_websocket(project_id: str, websocket: WebSocket):
     
     # Send all existing logs immediately upon connection
     if project_id in STATE:
-        for log in STATE[project_id]["progress"]:
-            await websocket.send_json({"log": log, "current_agent": STATE[project_id]["current_agent"]})
+        await websocket.send_json({"logs": STATE[project_id]["progress"], "current_agent": STATE[project_id]["current_agent"]})
 
 def disconnect_websocket(project_id: str, websocket: WebSocket):
     if project_id in CONNECTIONS and websocket in CONNECTIONS[project_id]:

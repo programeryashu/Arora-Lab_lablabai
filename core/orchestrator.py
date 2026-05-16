@@ -50,7 +50,7 @@ async def run_workflow(project_id: str, user_idea: str):
         add_progress(project_id, "🎉 Pipeline Complete!")
         
     except Exception as e:
+        update_agent(project_id, "error")
         add_progress(project_id, f"❌ Pipeline failed: {str(e)}")
-        # You could also set status to failed here if needed
 
 
