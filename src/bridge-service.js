@@ -6,7 +6,8 @@
 class BridgeService {
   constructor() {
     this.ws = null;
-    this.url = 'ws://localhost:8000/ws/bridge';
+    const WS_BASE = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000';
+    this.url = `${WS_BASE}/ws/bridge`;
     this.token = 'arora-secure-bridge-2024';
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 10;

@@ -3,8 +3,8 @@
  * Handles communication with the FastAPI backend
  */
 
-const API_BASE = "http://localhost:8000";
-const WS_BASE = "ws://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const WS_BASE = import.meta.env.VITE_WS_BASE_URL || "ws://localhost:8000";
 
 export const api = {
     /**

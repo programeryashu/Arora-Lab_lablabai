@@ -14,7 +14,7 @@ const ibmBobService = new IBMBobService();
 
 // ── Configuration ──
 const CONFIG = {
-  BASE_URL: 'http://localhost:8000',
+  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
   MODEL: 'meta/llama-3.3-70b-instruct', // Default high-perf model
   DEBUG: true
 };
