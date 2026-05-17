@@ -8,6 +8,9 @@ import { renderEditorView } from './views/editor.js';
 import { renderExecutionView } from './views/execution.js';
 import { api } from './api.js';
 import { navigateTo, setActiveProject } from './main.js';
+import { IBMBobService } from '../services/ibmBobService.js';
+
+const ibmBobService = new IBMBobService();
 
 // ── Configuration ──
 const CONFIG = {
@@ -33,59 +36,130 @@ const responses = {
   'clear': { icon: 'delete_sweep', text: '✓ Conversation cleared.', action: 'clear' },
 };
 
-// ── AI Abstraction ──
-async function askAI(prompt, history, onToken) {
-  if (CONFIG.DEBUG) console.log('[AI] Requesting response for:', prompt);
+// ── Provider Routing Helper ──
+function routeProvider(prompt, requestedProvider) {
+  if (requestedProvider && requestedProvider !== 'default' && requestedProvider !== 'auto') {
+    return requestedProvider;
+  }
   
+  const lower = prompt.toLowerCase();
+  
+  // 1. Coding -> DeepSeek
+  const codingKeywords = [
+    'code', 'function', 'api', 'endpoint', 'css', 'html', 'javascript', 'python', 
+    'react', 'tailwind', 'develop', 'program', 'script', 'bug', 'fix', 'refactor', 
+    'class', 'implement', 'coding', 'generate ui', 'db schema', 'sql'
+  ];
+  if (codingKeywords.some(kw => lower.includes(kw))) {
+    return 'deepseek';
+  }
+  
+  // 2. IBM BOB -> Research, planning, workflow analysis, documentation, enterprise reasoning
+  const bobKeywords = [
+    'research', 'analyze', 'workflow', 'document', 'readme', 'plan', 'structured', 
+    'enterprise', 'reasoning', 'architecture', 'requirements', 'features', 
+    'database design', 'outline', 'proposal', 'spec', 'specification'
+  ];
+  if (bobKeywords.some(kw => lower.includes(kw))) {
+    return 'ibm-bob';
+  }
+  
+  // 3. General -> default
+  return 'default';
+}
+
+// ── Default AI Caller ──
+async function callDefaultAI(prompt, history, onToken, modelOverride) {
   const messages = [
     { role: 'system', content: 'You are Arora Prime, the intelligent orchestrator of Arora Lab. You are concise, technical, and helpful. You manage AI agents, code workflows, and system operations. Use markdown for formatting. If the user asks for code, provide it in code blocks.' },
     ...history.map(m => ({ role: m.type === 'user' ? 'user' : 'assistant', content: m.text })),
     { role: 'user', content: prompt }
   ];
 
-  try {
-    const response = await fetch(`${CONFIG.BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: CONFIG.MODEL,
-        messages,
-        stream: true
-      })
-    });
+  const model = modelOverride || CONFIG.MODEL;
+  
+  const response = await fetch(`${CONFIG.BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: true
+    })
+  });
 
-    if (!response.ok) throw new Error(`AI API Error: ${response.statusText}`);
+  if (!response.ok) throw new Error(`AI API Error: ${response.statusText}`);
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let fullText = '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n');
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          if (data === '[DONE]') break;
-          try {
-            const json = JSON.parse(data);
-            const token = json.choices[0]?.delta?.content || '';
-            fullText += token;
-            if (onToken) onToken(fullText);
-          } catch (e) {}
-        }
+    const chunk = decoder.decode(value, { stream: true });
+    const lines = chunk.split('\n');
+    
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        if (data === '[DONE]') break;
+        try {
+          const json = JSON.parse(data);
+          const token = json.choices[0]?.delta?.content || '';
+          fullText += token;
+          if (onToken) onToken(fullText);
+        } catch (e) {}
       }
     }
-    return fullText;
-  } catch (error) {
-    console.error('[AI] Error:', error);
-    throw error;
+  }
+  return fullText;
+}
+
+// ── AI Abstraction ──
+async function askAI(prompt, optionsOrHistory, onTokenLegacy) {
+  if (CONFIG.DEBUG) console.log('[AI] Requesting response for:', prompt);
+  
+  let history = [];
+  let provider = 'default';
+  let callback = onTokenLegacy;
+
+  if (Array.isArray(optionsOrHistory)) {
+    history = optionsOrHistory;
+  } else if (optionsOrHistory && typeof optionsOrHistory === 'object') {
+    history = optionsOrHistory.history || [];
+    provider = optionsOrHistory.provider || 'default';
+    callback = optionsOrHistory.onToken || onTokenLegacy;
+  }
+
+  const resolvedProvider = routeProvider(prompt, provider);
+  if (CONFIG.DEBUG) console.log(`[AI] Routed provider: ${resolvedProvider} (requested: ${provider})`);
+
+  if (resolvedProvider === 'ibm-bob') {
+    try {
+      const messages = [
+        { role: 'system', content: 'You are Arora Prime (IBM BOB), the intelligent orchestrator of Arora Lab. You are concise, technical, and helpful. You manage AI agents, code workflows, and system operations. Use markdown for formatting.' },
+        ...history.map(m => ({ role: m.type === 'user' ? 'user' : 'assistant', content: m.text })),
+        { role: 'user', content: prompt }
+      ];
+
+      if (callback) {
+        return await ibmBobService.stream(messages, callback);
+      } else {
+        return await ibmBobService.chat(messages);
+      }
+    } catch (error) {
+      console.warn('[AI] IBM BOB failed, falling back to default provider. Error:', error);
+      // Fallback: route to default provider
+      return await callDefaultAI(prompt, history, callback);
+    }
+  } else if (resolvedProvider === 'deepseek') {
+    return await callDefaultAI(prompt, history, callback, 'deepseek-ai/deepseek-v4-flash');
+  } else {
+    return await callDefaultAI(prompt, history, callback);
   }
 }
 
@@ -100,8 +174,50 @@ function formatText(text) {
     .replace(/• /g, '<span class="text-tertiary mr-1">•</span> ');
 }
 
+// ── Typewriter Helper for HTML ──
+function typewriteHTML(element, htmlText, speed = 8, onComplete) {
+  let i = 0;
+  element.innerHTML = '';
+  
+  const cursor = document.createElement('span');
+  cursor.className = 'inline-block w-2 h-3.5 bg-tertiary ml-1 animate-pulse';
+  cursor.style.verticalAlign = 'middle';
+  element.appendChild(cursor);
+
+  function tick() {
+    if (i < htmlText.length) {
+      if (htmlText.charAt(i) === '<') {
+        const closeIndex = htmlText.indexOf('>', i);
+        if (closeIndex !== -1) {
+          i = closeIndex + 1;
+        } else {
+          i++;
+        }
+      } else {
+        i++;
+      }
+      
+      const currentHTML = htmlText.substring(0, i);
+      element.innerHTML = currentHTML;
+      element.appendChild(cursor);
+      
+      const scrollContainer = document.getElementById('ai-chat-scroll');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+      
+      setTimeout(tick, speed);
+    } else {
+      cursor.remove();
+      if (onComplete) onComplete();
+    }
+  }
+  
+  tick();
+}
+
 // ── Renderers ──
-function renderMessage(msg, isUser) {
+function renderMessage(msg, isUser, isLastMsg = false, isStreaming = false) {
   const text = typeof msg === 'string' ? msg : msg.text;
   const icon = typeof msg === 'string' ? 'person' : (msg.icon || 'psychology');
 
@@ -113,13 +229,17 @@ function renderMessage(msg, isUser) {
         </div>
       </div>`;
   }
+
+  const cursor = isStreaming ? '<span class="inline-block w-2 h-3.5 bg-tertiary ml-1 animate-pulse" style="vertical-align: middle;"></span>' : '';
+  const animatedAttr = (isLastMsg && !msg.animated && !isStreaming) ? 'data-animate="true"' : '';
+
   return `
-    <div class="flex gap-3 mb-3 ai-response-panel">
+    <div class="flex gap-3 mb-3 ai-response-panel" ${animatedAttr}>
       <div class="w-7 h-7 rounded-full bg-tertiary-container flex items-center justify-center text-tertiary shrink-0 mt-0.5 border border-tertiary/10">
         <span class="material-symbols-outlined text-[16px]">${icon}</span>
       </div>
-      <div class="flex-1 text-[14px] text-on-surface leading-relaxed whitespace-pre-wrap">
-        ${formatText(text)}
+      <div class="flex-1 text-[14px] text-on-surface leading-relaxed whitespace-pre-wrap message-content">
+        ${formatText(text)}${cursor}
       </div>
     </div>`;
 }
@@ -183,11 +303,12 @@ export async function handleCommand(input, container) {
     await askAI(input, messageHistory.slice(0, -1), (fullText) => {
       if (CONFIG.DEBUG && fullText.length % 50 === 0) console.log('[Streaming] Tokens received...');
       messageHistory[currentAIIndex].text = fullText;
-      renderChat(container, true);
+      messageHistory[currentAIIndex].animated = true; // Mark animated during streaming
+      renderChat(container, true, true);
     });
 
     saveHistory();
-    renderChat(container);
+    renderChat(container, false, false);
   } catch (error) {
     messageHistory.push({ type: 'ai', icon: 'error', text: `Failed to connect to Arora Prime. Error: ${error.message}` });
     saveHistory();
@@ -219,16 +340,35 @@ async function handleProjectCreation(input, container) {
   }
 }
 
-function renderChat(container, showTyping = false) {
+function renderChat(container, showTyping = false, isStreaming = false) {
   const scrollId = 'ai-chat-scroll';
   container.innerHTML = `
     <div class="glass-panel rounded-2xl p-4 max-h-[400px] overflow-y-auto space-y-0" id="${scrollId}">
-      ${messageHistory.map(m => renderMessage(m, m.type === 'user')).join('')}
+      ${messageHistory.map((m, idx) => {
+        const isLast = idx === messageHistory.length - 1;
+        return renderMessage(m, m.type === 'user', isLast, isLast && isStreaming);
+      }).join('')}
       ${showTyping && !messageHistory[messageHistory.length-1]?.text ? renderTypingIndicator() : ''}
     </div>`;
   
   const scroll = document.getElementById(scrollId);
   if (scroll) scroll.scrollTop = scroll.scrollHeight;
+
+  const animateEl = container.querySelector('[data-animate="true"]');
+  if (animateEl) {
+    const lastMsgIndex = messageHistory.length - 1;
+    const msg = messageHistory[lastMsgIndex];
+    if (msg && !msg.animated) {
+      msg.animated = true;
+      const contentEl = animateEl.querySelector('.message-content');
+      if (contentEl) {
+        const fullHTML = formatText(msg.text);
+        typewriteHTML(contentEl, fullHTML, 8, () => {
+          saveHistory();
+        });
+      }
+    }
+  }
 }
 
 export function clearHistory(container) {

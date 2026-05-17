@@ -48,12 +48,22 @@ const timelineData = {
 
 // ── State ──
 export let currentView = 'idle';
-export let activeProjectId = null;
-export let activeProjectIdea = null;
+export let activeProjectId = sessionStorage.getItem('arora_active_project_id') || null;
+export let activeProjectIdea = sessionStorage.getItem('arora_active_project_idea') || null;
 
 export function setActiveProject(id, idea) {
   activeProjectId = id;
   activeProjectIdea = idea;
+  if (id) {
+    sessionStorage.setItem('arora_active_project_id', id);
+  } else {
+    sessionStorage.removeItem('arora_active_project_id');
+  }
+  if (idea) {
+    sessionStorage.setItem('arora_active_project_idea', idea);
+  } else {
+    sessionStorage.removeItem('arora_active_project_idea');
+  }
 }
 
 // ── DOM References ──
@@ -311,6 +321,74 @@ function updateTimeline(viewName) {
 }
 
 // ═══════════════════════════════════════════════
+// TIMELINE PANEL TOGGLE
+// ═══════════════════════════════════════════════
+function initTimelineToggle() {
+  const rightPanel = document.getElementById('right-panel');
+  const toggleBtn = document.getElementById('timeline-toggle');
+  const toggleIcon = document.getElementById('timeline-icon');
+  const hideBtn = document.getElementById('btn-hide-timeline');
+
+  if (!rightPanel || !toggleBtn) return;
+
+  const toggle = () => {
+    const isCollapsed = rightPanel.classList.toggle('collapsed');
+    
+    if (isCollapsed) {
+      rightPanel.classList.remove('w-80', 'border-l');
+      rightPanel.classList.add('w-0', 'border-l-0', 'opacity-0', 'pointer-events-none');
+      
+      if (toggleIcon) {
+        toggleIcon.classList.remove('text-tertiary');
+        toggleIcon.classList.add('text-on-surface-variant');
+      }
+    } else {
+      rightPanel.classList.add('w-80', 'border-l');
+      rightPanel.classList.remove('w-0', 'border-l-0', 'opacity-0', 'pointer-events-none');
+      
+      if (toggleIcon) {
+        toggleIcon.classList.add('text-tertiary');
+        toggleIcon.classList.remove('text-on-surface-variant');
+      }
+    }
+  };
+
+  toggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggle();
+  });
+
+  hideBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggle();
+  });
+
+  // Sync initial color
+  const isCurrentlyCollapsed = rightPanel.classList.contains('collapsed');
+  const isXl = window.innerWidth >= 1280;
+  if (!isCurrentlyCollapsed && isXl) {
+    toggleIcon?.classList.add('text-tertiary');
+    toggleIcon?.classList.remove('text-on-surface-variant');
+  } else {
+    toggleIcon?.classList.remove('text-tertiary');
+    toggleIcon?.classList.add('text-on-surface-variant');
+  }
+
+  window.addEventListener('resize', () => {
+    const isCurrentlyCollapsed = rightPanel.classList.contains('collapsed');
+    const isXl = window.innerWidth >= 1280;
+    if (!isCurrentlyCollapsed && isXl) {
+      toggleIcon?.classList.add('text-tertiary');
+      toggleIcon?.classList.remove('text-on-surface-variant');
+    } else {
+      toggleIcon?.classList.remove('text-tertiary');
+      toggleIcon?.classList.add('text-on-surface-variant');
+    }
+  });
+}
+
+
+// ═══════════════════════════════════════════════
 // EVENTS
 // ═══════════════════════════════════════════════
 navTabs.forEach(t => t.addEventListener('click', e => { e.preventDefault(); navigateTo(t.dataset.view); }));
@@ -429,6 +507,9 @@ function initApp() {
 
   // Start real-time telemetry
   startRealTimeTelemetry();
+
+  // Initialize Activity Timeline hiding option
+  initTimelineToggle();
 
   // Add logout listener
   document.getElementById('user-avatar')?.addEventListener('click', () => {

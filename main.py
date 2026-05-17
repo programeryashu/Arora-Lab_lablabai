@@ -162,6 +162,89 @@ async def chat_completions(request: ChatRequest):
         print(f"Error in chat completions endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class BobChatRequest(BaseModel):
+    messages: list[ChatMessage]
+    stream: bool = False
+
+@app.post("/ibm-bob/chat")
+async def ibm_bob_chat(request: BobChatRequest):
+    import httpx
+    api_key = os.getenv("IBM_BOB_API_KEY")
+    url = os.getenv("IBM_BOB_URL") or "https://us-south.ml.cloud.ibm.com/ml/v1/text/chat?version=2024-05-01"
+    project_id = os.getenv("IBM_PROJECT_ID")
+
+    if not api_key:
+        raise HTTPException(status_code=500, detail="IBM_BOB_API_KEY not configured in environment.")
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json" if not request.stream else "text/event-stream"
+    }
+    
+    is_watsonx = "cloud.ibm.com" in url or project_id is not None
+
+    if is_watsonx:
+        try:
+            # 1. Exchange API Key for IAM Access Token
+            async with httpx.AsyncClient() as client:
+                token_resp = await client.post(
+                    "https://iam.cloud.ibm.com/identity/token",
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    data={
+                        "grant_type": "urn:ibm:params:oauth:grant-type:apikey",
+                        "apikey": api_key
+                    },
+                    timeout=10.0
+                )
+                token_resp.raise_for_status()
+                access_token = token_resp.json().get("access_token")
+                
+            headers["Authorization"] = f"Bearer {access_token}"
+            
+            # 2. Watsonx payload format
+            payload = {
+                "model_id": "ibm/granite-3-8b-instruct",
+                "project_id": project_id,
+                "messages": [{"role": msg.role, "content": msg.content} for msg in request.messages]
+            }
+        except Exception as auth_err:
+            print(f"IBM Watsonx Auth Error: {auth_err}")
+            raise HTTPException(status_code=500, detail=f"Watsonx Authentication failed: {str(auth_err)}")
+    else:
+        # Generic OpenAI-compatible mode
+        headers["Authorization"] = f"Bearer {api_key}"
+        payload = {
+            "model": "ibm-bob",
+            "messages": [{"role": msg.role, "content": msg.content} for msg in request.messages],
+            "stream": request.stream
+        }
+
+    # Execute request
+    if request.stream:
+        async def stream_generator():
+            try:
+                async with httpx.AsyncClient() as client:
+                    async with client.stream("POST", url, headers=headers, json=payload, timeout=30.0) as response:
+                        response.raise_for_status()
+                        async for chunk in response.aiter_lines():
+                            if chunk.strip():
+                                yield f"{chunk}\n\n"
+            except Exception as stream_err:
+                print(f"IBM Bob Stream Error: {stream_err}")
+                yield f"data: {json.dumps({'error': str(stream_err)})}\n\n"
+                
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
+    else:
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url, headers=headers, json=payload, timeout=30.0)
+                resp.raise_for_status()
+                return resp.json()
+        except Exception as req_err:
+            print(f"IBM Bob API Request Error: {req_err}")
+            raise HTTPException(status_code=500, detail=f"IBM Bob request failed: {str(req_err)}")
+
+
 class ProjectRequest(BaseModel):
     idea: str
 

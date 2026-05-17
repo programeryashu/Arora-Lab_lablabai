@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Set this to False to use real LLM calls (e.g. OpenRouter, NVIDIA)
-SIMULATION_MODE = False
+SIMULATION_MODE = os.getenv("SIMULATION_MODE", "True").lower() in ("true", "1", "yes")
 
 # API Keys and URLs are loaded dynamically per agent inside call_llm_json
 
@@ -67,7 +67,7 @@ async def call_llm_json(system_prompt: str, user_input: str, retries: int = 3) -
     """Calls the LLM and attempts to parse the result as JSON with retries."""
     
     if (SIMULATION_MODE):
-        await asyncio.sleep(1) # Faster simulation processing time
+        await asyncio.sleep(2) # Premium visual simulation processing time
         
         if system_prompt == PROMPT_PLANNER:
             return {
@@ -95,24 +95,24 @@ async def call_llm_json(system_prompt: str, user_input: str, retries: int = 3) -
     
     # Real LLM Call logic below
     # Select the model and credentials based on the prompt
-    model_id = "deepseek-ai/deepseek-v4-flash"
+    model_id = "meta/llama-3.3-70b-instruct"
     api_key = None
     base_url = None
 
     if system_prompt == PROMPT_PLANNER:
-        model_id = "mistralai/mistral-medium-3.5-128b"
+        model_id = "meta/llama-3.3-70b-instruct"
         api_key = os.getenv("PLANNER_API_KEY") or os.getenv("VITE_PLANNER_API_KEY")
         base_url = os.getenv("PLANNER_BASE_URL") or os.getenv("VITE_PLANNER_BASE_URL")
     elif system_prompt == PROMPT_FRONTEND:
-        model_id = "moonshotai/kimi-k2.6"
+        model_id = "meta/llama-3.3-70b-instruct"
         api_key = os.getenv("FRONTEND_API_KEY") or os.getenv("VITE_FRONTEND_API_KEY")
         base_url = os.getenv("FRONTEND_BASE_URL") or os.getenv("VITE_FRONTEND_BASE_URL")
     elif system_prompt == PROMPT_BACKEND:
-        model_id = "deepseek-ai/deepseek-v4-flash"
+        model_id = "meta/llama-3.3-70b-instruct"
         api_key = os.getenv("BACKEND_API_KEY") or os.getenv("VITE_BACKEND_API_KEY")
         base_url = os.getenv("BACKEND_BASE_URL") or os.getenv("VITE_BACKEND_BASE_URL")
     elif system_prompt == PROMPT_DOCS:
-        model_id = "google/gemma-4-31b-it"
+        model_id = "meta/llama-3.1-8b-instruct"
         api_key = os.getenv("DOCS_API_KEY") or os.getenv("VITE_DOCS_API_KEY")
         base_url = os.getenv("DOCS_BASE_URL") or os.getenv("VITE_DOCS_BASE_URL")
 
@@ -124,24 +124,37 @@ async def call_llm_json(system_prompt: str, user_input: str, retries: int = 3) -
     last_error = None
     for attempt in range(retries):
         try:
-            response = await client.chat.completions.create(
-                model=model_id,
-                response_format={ "type": "json_object" },
-                messages=[
-                    {"role": "system", "content": system_prompt + "\n\nEnsure your ENTIRE response is valid JSON and nothing else."},
-                    {"role": "user", "content": f"USER INPUT:\n{user_input}"}
-                ]
-            )
+            # Attempt with json_object formatting
+            try:
+                response = await client.chat.completions.create(
+                    model=model_id,
+                    response_format={ "type": "json_object" },
+                    messages=[
+                        {"role": "system", "content": system_prompt + "\n\nEnsure your ENTIRE response is valid JSON and nothing else."},
+                        {"role": "user", "content": f"USER INPUT:\n{user_input}"}
+                    ]
+                )
+            except Exception as format_err:
+                print(f"Fallback: model does not support response_format type json_object: {format_err}")
+                response = await client.chat.completions.create(
+                    model=model_id,
+                    messages=[
+                        {"role": "system", "content": system_prompt + "\n\nEnsure your ENTIRE response is valid JSON and nothing else."},
+                        {"role": "user", "content": f"USER INPUT:\n{user_input}"}
+                    ]
+                )
+                
             text = response.choices[0].message.content
             # Clean up markdown code blocks if present
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
+            text_cleaned = text.strip()
+            if text_cleaned.startswith("```json"):
+                text_cleaned = text_cleaned[7:]
+            elif text_cleaned.startswith("```"):
+                text_cleaned = text_cleaned[3:]
+            if text_cleaned.endswith("```"):
+                text_cleaned = text_cleaned[:-3]
                 
-            return json.loads(text.strip())
+            return json.loads(text_cleaned.strip())
         except Exception as e:
             last_error = e
             print(f"LLM Error on attempt {attempt + 1}: {e}")

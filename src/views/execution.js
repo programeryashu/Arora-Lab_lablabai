@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════
 
 import { api } from '../api.js';
-import { activeProjectId, activeProjectIdea } from '../main.js';
+import { activeProjectId, activeProjectIdea, navigateTo } from '../main.js';
 import { bridgeService } from '../bridge-service.js';
 
 let logSocket = null;
@@ -88,6 +88,24 @@ function updateWorkflowNodes(currentAgent) {
       node.className = "glass-panel p-4 rounded-2xl w-48 flex flex-col items-center text-center ambient-shadow relative opacity-60";
     }
   });
+
+  if (currentAgent === 'completed') {
+    // 1. Swap actions in header to show pulsing Start Coding button
+    const actionsContainer = document.getElementById('execution-actions');
+    if (actionsContainer && !document.getElementById('header-start-coding-btn')) {
+      actionsContainer.innerHTML = `
+        <button id="header-start-coding-btn" class="px-5 py-2 rounded-lg bg-tertiary text-on-tertiary text-[14px] font-bold flex items-center gap-2 hover:bg-tertiary/90 shadow-sm transition-all animate-pulse">
+          <span class="material-symbols-outlined text-[18px]">code</span> Start Coding
+        </button>
+      `;
+      document.getElementById('header-start-coding-btn')?.addEventListener('click', () => {
+        navigateTo('editor');
+      });
+    }
+
+    // 2. Automatically launch clarification modal
+    showCompletionModal();
+  }
 }
 
 function updateTimeline(agent, lastLog) {
@@ -130,7 +148,7 @@ function workflowCanvas() {
           <h2 id="execution-title" class="text-headline-lg text-on-surface font-semibold">Execution Workflow</h2>
           <p class="text-body-md text-on-surface-variant mt-2">Live AI sequence running. Monitoring memory and steps.</p>
         </div>
-        <div class="flex gap-3">
+        <div id="execution-actions" class="flex gap-3">
           <button class="px-4 py-2 rounded-lg glass-panel text-[14px] font-semibold text-on-surface flex items-center gap-2 hover:bg-surface-variant/20 transition-colors">
             <span class="material-symbols-outlined text-[18px]">pause</span> Pause
           </button>
@@ -283,4 +301,179 @@ function statusBar(label, value, percent) {
         <div class="bg-secondary h-full rounded-full transition-all duration-700" style="width:${percent}%"></div>
       </div>
     </div>`;
+}
+
+function showCompletionModal() {
+  if (document.getElementById('execution-completion-modal')) return;
+
+  const modalHtml = `
+    <div id="execution-completion-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="w-full max-w-2xl bg-white/95 rounded-2xl shadow-2xl border border-outline-variant/30 overflow-hidden flex flex-col transform scale-95 transition-all duration-300 glass-panel p-6" id="completion-modal-window">
+        <!-- Header -->
+        <div class="flex items-center gap-4 mb-6 border-b border-outline-variant/20 pb-4">
+          <div class="w-12 h-12 rounded-full bg-tertiary/10 flex items-center justify-center text-tertiary">
+            <span class="material-symbols-outlined text-[28px]">check_circle</span>
+          </div>
+          <div>
+            <h3 class="text-headline-sm font-bold text-on-surface">Execution Sequence Complete</h3>
+            <p class="text-body-md text-on-surface-variant">Arora Prime has scaffolded the autonomous workspace files successfully.</p>
+          </div>
+        </div>
+
+        <!-- Contents: What We Are Going to Build / What has been built -->
+        <div class="space-y-4 mb-6">
+          <div class="p-4 bg-surface-container-low border border-outline-variant/20 rounded-xl">
+            <h4 class="text-label-md font-bold text-tertiary mb-3 flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px]">build</span> Scaffolding & Preparation Summary
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-[18px] text-on-surface-variant mt-0.5">dataset</span>
+                <div>
+                  <span class="text-body-sm font-bold text-on-surface">Planner Config</span>
+                  <p class="text-[11px] text-on-surface-variant">Full project timeline and agent sequencing scaffolding built.</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-[18px] text-on-surface-variant mt-0.5">code</span>
+                <div>
+                  <span class="text-body-sm font-bold text-on-surface">Frontend Interface</span>
+                  <p class="text-[11px] text-on-surface-variant">Glassmorphism UI layouts, charts, and main panels structured.</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-[18px] text-on-surface-variant mt-0.5">storage</span>
+                <div>
+                  <span class="text-body-sm font-bold text-on-surface">Backend & AI Routing</span>
+                  <p class="text-[11px] text-on-surface-variant">FastAPI database schemas, watsonx API streams & IBM BOB routes ready.</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5">
+                <span class="material-symbols-outlined text-[18px] text-on-surface-variant mt-0.5">description</span>
+                <div>
+                  <span class="text-body-sm font-bold text-on-surface">Project Documentation</span>
+                  <p class="text-[11px] text-on-surface-variant">Setup manuals, dependencies config, and API integration references.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 bg-tertiary/5 border border-tertiary/10 rounded-xl relative overflow-hidden">
+            <div class="absolute left-0 top-0 bottom-0 w-1 bg-tertiary"></div>
+            <h4 class="text-label-md font-bold text-on-surface mb-2 flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px]">terminal</span> Next Steps: Start Coding in Editor
+            </h4>
+            <p class="text-[12px] text-on-surface-variant leading-relaxed">
+              We are now moving to the <strong>Integrated Code Editor</strong> view. 
+              In the editor, we will review the scaffolded code, adjust the active variables, customize component themes, run the server, and write our core business logic.
+            </p>
+          </div>
+        </div>
+
+        <!-- Auto redirect countdown -->
+        <div class="mb-6 flex items-center justify-between bg-surface-container-high/40 p-3 rounded-lg border border-outline-variant/10">
+          <span id="countdown-label" class="text-label-sm text-on-surface-variant flex items-center gap-2">
+            <span class="material-symbols-outlined text-[16px] animate-spin text-tertiary">autorenew</span>
+            Redirecting to Code Editor automatically in <strong id="countdown-sec" class="text-tertiary font-bold">5</strong> seconds...
+          </span>
+          <button id="countdown-cancel-btn" class="px-3 py-1 rounded-md text-[11px] font-bold bg-surface-container-high hover:bg-surface-variant/40 text-on-surface-variant border border-outline-variant/20 transition-all">
+            Stay on Logs
+          </button>
+        </div>
+
+        <!-- Footer -->
+        <div class="flex justify-end gap-3 border-t border-outline-variant/20 pt-4">
+          <button id="completion-modal-cancel" class="px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/20 text-[13px] font-semibold transition-all">
+            Review Logs
+          </button>
+          <button id="completion-modal-start" class="px-5 py-2 rounded-lg bg-tertiary text-on-tertiary hover:bg-tertiary/90 text-[13px] font-bold flex items-center gap-1.5 shadow-sm transition-all">
+            <span>Start Coding</span>
+            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // Scale modal window in smoothly
+  setTimeout(() => {
+    const win = document.getElementById('completion-modal-window');
+    if (win) {
+      win.classList.remove('scale-95');
+      win.classList.add('scale-100');
+    }
+  }, 10);
+
+  // Set up the countdown logic
+  let secondsRemaining = 5;
+  const secEl = document.getElementById('countdown-sec');
+  const labelEl = document.getElementById('countdown-label');
+  const countdownCancelBtn = document.getElementById('countdown-cancel-btn');
+
+  const countdownInterval = setInterval(() => {
+    secondsRemaining--;
+    if (secEl) secEl.textContent = secondsRemaining;
+
+    if (secondsRemaining <= 0) {
+      clearInterval(countdownInterval);
+      closeCompletionModal();
+      navigateTo('editor');
+    }
+  }, 1000);
+
+  // Function to stop countdown
+  function cancelCountdown() {
+    clearInterval(countdownInterval);
+    if (labelEl) {
+      labelEl.innerHTML = `
+        <span class="material-symbols-outlined text-[16px] text-tertiary">check_circle</span>
+        Automatic transition suspended. You can review logs or switch views when ready.
+      `;
+    }
+    if (countdownCancelBtn) {
+      countdownCancelBtn.style.display = 'none';
+    }
+  }
+
+  countdownCancelBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    cancelCountdown();
+  });
+
+  // Bind close on "Review Logs"
+  const cancelBtn = document.getElementById('completion-modal-cancel');
+  cancelBtn?.addEventListener('click', () => {
+    cancelCountdown();
+    closeCompletionModal();
+  });
+
+  // Bind navigate on "Start Coding"
+  const startBtn = document.getElementById('completion-modal-start');
+  startBtn?.addEventListener('click', () => {
+    cancelCountdown();
+    closeCompletionModal();
+    navigateTo('editor');
+  });
+
+  const overlay = document.getElementById('execution-completion-modal');
+  overlay?.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      cancelCountdown();
+      closeCompletionModal();
+    }
+  });
+}
+
+function closeCompletionModal() {
+  const overlay = document.getElementById('execution-completion-modal');
+  const win = document.getElementById('completion-modal-window');
+  if (win) {
+    win.classList.remove('scale-100');
+    win.classList.add('scale-95');
+  }
+  setTimeout(() => {
+    overlay?.remove();
+  }, 150);
 }

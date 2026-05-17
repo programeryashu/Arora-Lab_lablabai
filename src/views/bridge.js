@@ -5,6 +5,32 @@
 
 import { bridgeService } from '../bridge-service.js';
 
+let activeExplorerUnit = null; // 'cpu' | 'ram' | 'temp' | 'link'
+let telemetryHistory = {
+  cpu: [],
+  ram: [],
+  temp: [],
+  link: []
+};
+let peakRecords = {
+  cpu: 0,
+  ram: 0,
+  temp: 0,
+  link: 0
+};
+let minRecords = {
+  cpu: 100,
+  ram: 100,
+  temp: 100,
+  link: 100
+};
+let diagnosticLog = {
+  cpu: [],
+  ram: [],
+  temp: [],
+  link: []
+};
+
 export function renderBridgeView() {
   return `
     <div class="flex-1 flex flex-col p-6 overflow-y-auto bg-surface/20">
@@ -57,7 +83,7 @@ export function renderBridgeView() {
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           
           <!-- CPU Activity -->
-          <div class="glass-panel-strong rounded-3xl p-8 border border-outline-variant/10 hover:border-tertiary/40 transition-all relative overflow-hidden group">
+          <div id="btn-explore-cpu" class="glass-panel-strong rounded-3xl p-8 border border-outline-variant/10 hover:border-tertiary/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all duration-300 relative overflow-hidden group">
             <div class="absolute -right-4 -top-4 w-32 h-32 bg-tertiary/5 rounded-full blur-3xl group-hover:bg-tertiary/10 transition-all"></div>
             <div class="flex items-center justify-between mb-8 relative z-10">
               <div class="flex flex-col">
@@ -90,7 +116,7 @@ export function renderBridgeView() {
           </div>
 
           <!-- Memory Matrix -->
-          <div class="glass-panel-strong rounded-3xl p-8 border border-outline-variant/10 hover:border-secondary/40 transition-all relative overflow-hidden group">
+          <div id="btn-explore-ram" class="glass-panel-strong rounded-3xl p-8 border border-outline-variant/10 hover:border-secondary/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all duration-300 relative overflow-hidden group">
             <div class="absolute -right-4 -top-4 w-32 h-32 bg-secondary/5 rounded-full blur-3xl group-hover:bg-secondary/10 transition-all"></div>
             <div class="flex items-center justify-between mb-8 relative z-10">
               <div class="flex flex-col">
@@ -126,7 +152,7 @@ export function renderBridgeView() {
           </div>
 
           <!-- Thermal Control -->
-          <div class="glass-panel-strong rounded-3xl p-8 border border-outline-variant/10 hover:border-error/40 transition-all relative overflow-hidden group">
+          <div id="btn-explore-temp" class="glass-panel-strong rounded-3xl p-8 border border-outline-variant/10 hover:border-error/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all duration-300 relative overflow-hidden group">
             <div class="absolute -right-4 -top-4 w-32 h-32 bg-error/5 rounded-full blur-3xl group-hover:bg-error/10 transition-all"></div>
             <div class="flex items-center justify-between mb-8 relative z-10">
               <div class="flex flex-col">
@@ -150,7 +176,7 @@ export function renderBridgeView() {
           </div>
 
           <!-- Bridge Connection -->
-          <div class="glass-panel-strong rounded-3xl p-8 border border-outline-variant/10 bg-success/[0.01] hover:border-success/40 transition-all relative overflow-hidden group">
+          <div id="btn-explore-link" class="glass-panel-strong rounded-3xl p-8 border border-outline-variant/10 bg-success/[0.01] hover:border-success/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all duration-300 relative overflow-hidden group">
             <div class="absolute -right-4 -top-4 w-32 h-32 bg-success/5 rounded-full blur-3xl group-hover:bg-success/10 transition-all"></div>
             <div class="flex items-center justify-between mb-8 relative z-10">
               <div class="flex flex-col">
@@ -296,6 +322,96 @@ export function renderBridgeView() {
 
         </div>
 
+        <!-- Telemetry Explorer Modal -->
+        <div id="telemetry-modal" class="fixed inset-0 z-[1000] hidden items-center justify-center p-6 bg-background/80 backdrop-blur-2xl transition-all duration-300 opacity-0">
+          <div class="glass-panel-strong max-w-[900px] w-full rounded-[32px] p-8 border border-outline-variant/30 shadow-[0_20px_50px_rgba(0,0,0,0.4)] relative flex flex-col max-h-[90vh] overflow-hidden transform scale-95 transition-all duration-300">
+            
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-6 border-b border-outline-variant/10 mb-6">
+              <div class="flex items-center gap-4">
+                <div id="modal-icon-container" class="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-inner animate-[pulse_3s_infinite]">
+                  <span id="modal-icon" class="material-symbols-outlined text-[24px]">analytics</span>
+                </div>
+                <div>
+                  <h3 id="modal-title" class="text-[16px] font-black uppercase tracking-[0.25em] text-on-surface">Telemetry Explorer</h3>
+                  <p id="modal-subtitle" class="text-[11px] text-on-surface-variant/70 font-bold uppercase mt-1 tracking-wider">Deep System Diagnostics</p>
+                </div>
+              </div>
+              <button id="modal-close" class="w-10 h-10 rounded-full hover:bg-surface-container flex items-center justify-center border border-outline-variant/10 hover:border-outline-variant/30 text-on-surface-variant transition-all">
+                <span class="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="flex-1 overflow-y-auto space-y-8 pr-2 custom-scrollbar">
+              
+              <!-- Metric Summary Bento -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-surface-container/20 rounded-2xl p-4 border border-outline-variant/5">
+                  <span class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/50">Current Value</span>
+                  <div class="flex items-baseline gap-1 mt-1">
+                    <span id="metric-current" class="text-3xl font-black text-on-surface">--</span>
+                    <span id="metric-unit" class="text-[12px] font-black text-on-surface-variant/50"></span>
+                  </div>
+                </div>
+                <div class="bg-surface-container/20 rounded-2xl p-4 border border-outline-variant/5">
+                  <span class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/50">Peak Record</span>
+                  <div class="flex items-baseline gap-1 mt-1">
+                    <span id="metric-peak" class="text-3xl font-black text-on-surface">--</span>
+                    <span id="metric-unit-peak" class="text-[12px] font-black text-on-surface-variant/50"></span>
+                  </div>
+                </div>
+                <div class="bg-surface-container/20 rounded-2xl p-4 border border-outline-variant/5">
+                  <span class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/50">Minimum Record</span>
+                  <div class="flex items-baseline gap-1 mt-1">
+                    <span id="metric-min" class="text-3xl font-black text-on-surface">--</span>
+                    <span id="metric-unit-min" class="text-[12px] font-black text-on-surface-variant/50"></span>
+                  </div>
+                </div>
+                <div class="bg-surface-container/20 rounded-2xl p-4 border border-outline-variant/5">
+                  <span class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/50">Diagnostic Shield</span>
+                  <div class="mt-2.5">
+                    <span id="metric-status-badge" class="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded bg-success/15 text-success border border-success/10">Active</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Graphic Report Chart Container -->
+              <div class="bg-surface-container/10 rounded-3xl p-6 border border-outline-variant/10 relative overflow-hidden flex flex-col h-[280px]">
+                <div class="absolute inset-0 pointer-events-none opacity-[0.02]" style="background-image: radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0); background-size: 24px 24px;"></div>
+                <div class="flex items-center justify-between mb-4 z-10">
+                  <span class="text-[11px] font-black uppercase tracking-[0.2em] text-on-surface-variant/70">Real-Time Wave Telemetry Report</span>
+                  <span class="text-[10px] font-mono text-tertiary flex items-center gap-1.5 uppercase font-black tracking-widest animate-pulse">
+                    <span class="w-1.5 h-1.5 rounded-full bg-tertiary shadow-[0_0_8px_rgba(0,96,172,0.4)]"></span> LIVE FEED
+                  </span>
+                </div>
+                <div class="flex-1 relative min-h-0">
+                  <canvas id="telemetry-chart" class="w-full h-full block z-10 relative"></canvas>
+                </div>
+              </div>
+
+              <!-- Detailed Stats Table -->
+              <div class="space-y-3">
+                <span class="text-[11px] font-black uppercase tracking-[0.2em] text-on-surface-variant/70">Recent Telemetry Frames</span>
+                <div class="border border-outline-variant/15 rounded-2xl overflow-hidden bg-surface-container/5">
+                  <div class="grid grid-cols-12 gap-4 px-6 py-3 border-b border-outline-variant/10 bg-surface-container/20 text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60">
+                    <div class="col-span-3">Timestamp</div>
+                    <div class="col-span-3">Registered Value</div>
+                    <div class="col-span-3">Integrity Rating</div>
+                    <div class="col-span-3">Dynamic State</div>
+                  </div>
+                  <div id="recent-telemetry-rows" class="divide-y divide-outline-variant/10 max-h-[160px] overflow-y-auto custom-scrollbar font-mono text-[12px] text-on-surface-variant">
+                    <div class="grid grid-cols-12 gap-4 px-6 py-3 items-center">
+                      <div class="col-span-12 text-center text-on-surface-variant/40 py-2">Waiting for next data stream...</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   `;
@@ -312,7 +428,8 @@ export function initBridgeView() {
     }
   });
 
-  // Professional boot sequence only if not already connected
+  setupModalListeners();
+
   if (!bridgeService.isConnected) {
     runConnectionSequence();
   } else {
@@ -324,8 +441,287 @@ export function initBridgeView() {
   };
 }
 
+function setupModalListeners() {
+  const btnCpu = document.getElementById('btn-explore-cpu');
+  const btnRam = document.getElementById('btn-explore-ram');
+  const btnTemp = document.getElementById('btn-explore-temp');
+  const btnLink = document.getElementById('btn-explore-link');
+  const modal = document.getElementById('telemetry-modal');
+  const closeBtn = document.getElementById('modal-close');
+
+  if (btnCpu) btnCpu.addEventListener('click', () => openExplorer('cpu'));
+  if (btnRam) btnRam.addEventListener('click', () => openExplorer('ram'));
+  if (btnTemp) btnTemp.addEventListener('click', () => openExplorer('temp'));
+  if (btnLink) btnLink.addEventListener('click', () => openExplorer('link'));
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => closeExplorer());
+  }
+
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeExplorer();
+    });
+  }
+}
+
+function openExplorer(unit) {
+  activeExplorerUnit = unit;
+  
+  const modal = document.getElementById('telemetry-modal');
+  if (!modal) return;
+
+  const iconContainer = document.getElementById('modal-icon-container');
+  const icon = document.getElementById('modal-icon');
+  const title = document.getElementById('modal-title');
+  const subtitle = document.getElementById('modal-subtitle');
+  const unitLabel = document.getElementById('metric-unit');
+  const unitLabelPeak = document.getElementById('metric-unit-peak');
+  const unitLabelMin = document.getElementById('metric-unit-min');
+
+  let themeClass = '';
+  let iconName = '';
+  let titleText = '';
+  let subtitleText = '';
+  let unitText = '';
+
+  switch (unit) {
+    case 'cpu':
+      themeClass = 'text-tertiary bg-tertiary/10 border-tertiary/20';
+      iconName = 'memory';
+      titleText = 'Compute Engine Explorer';
+      subtitleText = 'Real-time CPU Instruction Matrix';
+      unitText = '%';
+      break;
+    case 'ram':
+      themeClass = 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20';
+      iconName = 'layers';
+      titleText = 'Memory Array Explorer';
+      subtitleText = 'Ecc Allocation & Matrix Load';
+      unitText = '%';
+      break;
+    case 'temp':
+      themeClass = 'text-error bg-error/10 border-error/20';
+      iconName = 'thermostat';
+      titleText = 'Thermal Core Explorer';
+      subtitleText = 'Core Thermal Dissipation Sensor';
+      unitText = '°C';
+      break;
+    case 'link':
+      themeClass = 'text-success bg-success/10 border-success/20';
+      iconName = 'hub';
+      titleText = 'Neural Link Explorer';
+      subtitleText = 'Network Stream Integration Integrity';
+      unitText = '%';
+      break;
+  }
+
+  if (iconContainer) {
+    iconContainer.className = `w-12 h-12 rounded-2xl flex items-center justify-center border shadow-inner ${themeClass}`;
+  }
+  if (icon) icon.textContent = iconName;
+  if (title) title.textContent = titleText;
+  if (subtitle) subtitle.textContent = subtitleText;
+  if (unitLabel) unitLabel.textContent = unitText;
+  if (unitLabelPeak) unitLabelPeak.textContent = unitText;
+  if (unitLabelMin) unitLabelMin.textContent = unitText;
+
+  const currentVal = telemetryHistory[unit].length > 0 ? telemetryHistory[unit][telemetryHistory[unit].length - 1] : 0;
+  updateModalValues(unit, currentVal);
+  renderLogRows(unit);
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  
+  void modal.offsetWidth;
+  
+  modal.classList.remove('opacity-0');
+  modal.classList.add('opacity-100');
+  modal.firstElementChild.classList.remove('scale-95');
+  modal.firstElementChild.classList.add('scale-100');
+
+  setTimeout(() => {
+    const canvas = document.getElementById('telemetry-chart');
+    const color = getUnitColor(unit);
+    drawChart(canvas, telemetryHistory[unit], color, unitText);
+  }, 100);
+}
+
+function closeExplorer() {
+  const modal = document.getElementById('telemetry-modal');
+  if (!modal) return;
+
+  modal.classList.remove('opacity-100');
+  modal.classList.add('opacity-0');
+  modal.firstElementChild.classList.remove('scale-100');
+  modal.firstElementChild.classList.add('scale-95');
+
+  setTimeout(() => {
+    modal.classList.remove('flex');
+    modal.classList.add('hidden');
+    activeExplorerUnit = null;
+  }, 300);
+}
+
+function updateModalValues(unit, currentVal) {
+  const currentEl = document.getElementById('metric-current');
+  const peakEl = document.getElementById('metric-peak');
+  const minEl = document.getElementById('metric-min');
+  const badgeEl = document.getElementById('metric-status-badge');
+
+  if (currentEl) currentEl.textContent = typeof currentVal === 'number' ? currentVal.toFixed(1) : currentVal;
+  if (peakEl) peakEl.textContent = peakRecords[unit].toFixed(1);
+  if (minEl) minEl.textContent = minRecords[unit] === 100 ? currentVal.toFixed(1) : minRecords[unit].toFixed(1);
+
+  if (badgeEl) {
+    let text = 'Nominal';
+    let statusClass = 'bg-success/15 text-success border-success/10';
+
+    if (unit === 'temp' && currentVal > 75) {
+      text = 'Critical';
+      statusClass = 'bg-error/15 text-error border-error/10 animate-pulse';
+    } else if (unit === 'temp' && currentVal > 60) {
+      text = 'Warning';
+      statusClass = 'bg-warning/15 text-warning border-warning/10';
+    } else if (unit === 'cpu' && currentVal > 85) {
+      text = 'Overload';
+      statusClass = 'bg-warning/15 text-warning border-warning/10';
+    } else if (unit === 'link' && currentVal < 90) {
+      text = 'Degraded';
+      statusClass = 'bg-error/15 text-error border-error/10';
+    }
+
+    badgeEl.textContent = text;
+    badgeEl.className = `text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded border ${statusClass}`;
+  }
+}
+
+function renderLogRows(unit) {
+  const container = document.getElementById('recent-telemetry-rows');
+  if (!container) return;
+
+  const logs = diagnosticLog[unit];
+  if (!logs || logs.length === 0) {
+    container.innerHTML = `
+      <div class="grid grid-cols-12 gap-4 px-6 py-3 items-center">
+        <div class="col-span-12 text-center text-on-surface-variant/40 py-2">Waiting for next data stream...</div>
+      </div>
+    `;
+    return;
+  }
+
+  const html = [...logs].reverse().map(log => `
+    <div class="grid grid-cols-12 gap-4 px-6 py-3 items-center hover:bg-surface-container/10 transition-colors">
+      <div class="col-span-3 text-on-surface-variant/50">${log.timestamp}</div>
+      <div class="col-span-3 font-bold text-on-surface">${log.value.toFixed(1)}</div>
+      <div class="col-span-3 text-success">${log.rating}</div>
+      <div class="col-span-3">
+        <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${
+          log.status === 'Nominal' ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
+        }">${log.status}</span>
+      </div>
+    </div>
+  `).join('');
+
+  container.innerHTML = html;
+}
+
+function getUnitColor(unit) {
+  switch (unit) {
+    case 'cpu': return 'rgba(0, 96, 172, 1)';
+    case 'ram': return 'rgba(99, 102, 241, 1)';
+    case 'temp': return 'rgba(239, 68, 68, 1)';
+    case 'link': return 'rgba(34, 197, 94, 1)';
+    default: return 'rgba(255, 255, 255, 1)';
+  }
+}
+
+function drawChart(canvas, history, color, unitSuffix) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const width = rect.width;
+  const height = rect.height;
+
+  ctx.clearRect(0, 0, width, height);
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+  ctx.lineWidth = 1;
+  
+  const gridRows = 4;
+  for (let i = 0; i <= gridRows; i++) {
+    const y = (height / gridRows) * i;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+
+  const gridCols = 8;
+  for (let i = 0; i <= gridCols; i++) {
+    const x = (width / gridCols) * i;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+
+  if (history.length < 2) return;
+
+  const getX = (index) => (width / (history.length - 1)) * index;
+  const getY = (val) => height - ((height - 30) * (val / 100)) - 15;
+
+  ctx.beginPath();
+  ctx.moveTo(0, height);
+  for (let i = 0; i < history.length; i++) {
+    ctx.lineTo(getX(i), getY(history[i]));
+  }
+  ctx.lineTo(width, height);
+  ctx.closePath();
+
+  const areaGrad = ctx.createLinearGradient(0, 0, 0, height);
+  areaGrad.addColorStop(0, color.replace('1)', '0.25)'));
+  areaGrad.addColorStop(1, color.replace('1)', '0.0)'));
+  ctx.fillStyle = areaGrad;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(0, getY(history[0]));
+  for (let i = 1; i < history.length; i++) {
+    ctx.lineTo(getX(i), getY(history[i]));
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3.5;
+  ctx.shadowColor = color.replace('1)', '0.4)');
+  ctx.shadowBlur = 12;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const endVal = history[history.length - 1];
+  const endX = getX(history.length - 1);
+  const endY = getY(endVal);
+
+  ctx.beginPath();
+  ctx.arc(endX, endY, 6, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(endX, endY, 12, 0, Math.PI * 2);
+  ctx.strokeStyle = color.replace('1)', '0.3)');
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
 function updateTelemetryUI(data) {
-  // Device Info
   const deviceEl = document.getElementById('bridge-device-info');
   if (deviceEl && data.device) {
     deviceEl.innerHTML = `
@@ -344,35 +740,76 @@ function updateTelemetryUI(data) {
     if (archEl) archEl.textContent = data.device.arch || 'x64_64';
   }
 
-  // CPU Telemetry
+  const cpuValRaw = data.cpu.load;
+  const ramValRaw = data.ram.percent;
+  const tempValRaw = data.temp;
+  const linkValRaw = 99.8 + (Math.sin(Date.now() / 2000) * 0.15) + (Math.random() * 0.05);
+
+  const timestampStr = new Date().toLocaleTimeString();
+  const updateUnitHistory = (unit, val) => {
+    const history = telemetryHistory[unit];
+    history.push(val);
+    if (history.length > 40) history.shift();
+
+    peakRecords[unit] = Math.max(peakRecords[unit], val);
+    minRecords[unit] = Math.min(minRecords[unit], val);
+
+    diagnosticLog[unit].push({
+      timestamp: timestampStr,
+      value: val,
+      rating: '99.98%',
+      status: (unit === 'temp' && val > 75) ? 'Critical' : 'Nominal'
+    });
+    if (diagnosticLog[unit].length > 20) diagnosticLog[unit].shift();
+  };
+
+  updateUnitHistory('cpu', cpuValRaw);
+  updateUnitHistory('ram', ramValRaw);
+  updateUnitHistory('temp', tempValRaw);
+  updateUnitHistory('link', linkValRaw);
+
   const cpuVal = document.getElementById('bridge-cpu-val');
   const cpuBar = document.getElementById('bridge-cpu-bar');
   const cpuCores = document.getElementById('bridge-cpu-cores');
-  if (cpuVal) cpuVal.textContent = Math.round(data.cpu.load);
-  if (cpuBar) cpuBar.style.width = `${data.cpu.load}%`;
+  if (cpuVal) cpuVal.textContent = Math.round(cpuValRaw);
+  if (cpuBar) cpuBar.style.width = `${cpuValRaw}%`;
   if (cpuCores) cpuCores.textContent = `${data.cpu.cores} Physical Cores Online`;
 
-  // RAM Matrix
   const ramVal = document.getElementById('bridge-ram-val');
   const ramBar = document.getElementById('bridge-ram-bar');
   const ramDetail = document.getElementById('bridge-ram-detail');
   if (ramVal) ramVal.textContent = data.ram.used.toFixed(1);
-  if (ramBar) ramBar.style.width = `${data.ram.percent}%`;
+  if (ramBar) ramBar.style.width = `${ramValRaw}%`;
   if (ramDetail) ramDetail.textContent = `${data.ram.used.toFixed(1)}GB / ${data.ram.total.toFixed(1)}GB`;
 
-  // Thermal Grid
   const tempVal = document.getElementById('bridge-temp-val');
   const tempIndicator = document.getElementById('bridge-temp-indicator');
-  if (tempVal) tempVal.textContent = Math.round(data.temp);
+  if (tempVal) tempVal.textContent = Math.round(tempValRaw);
   
   if (tempIndicator) {
-    if (data.temp > 80) {
+    if (tempValRaw > 80) {
       tempIndicator.innerHTML = `<div class="w-2 h-2 rounded-full bg-error animate-pulse shadow-[0_0_8px_rgba(255,82,82,0.4)]"></div><span class="text-[10px] text-error font-bold uppercase tracking-widest">Critical</span>`;
-    } else if (data.temp > 65) {
+    } else if (tempValRaw > 65) {
       tempIndicator.innerHTML = `<div class="w-2 h-2 rounded-full bg-warning shadow-[0_0_8px_rgba(255,193,7,0.4)]"></div><span class="text-[10px] text-warning font-bold uppercase tracking-widest">Elevated</span>`;
     } else {
       tempIndicator.innerHTML = `<div class="w-2 h-2 rounded-full bg-success shadow-[0_0_8px_rgba(76,175,80,0.4)]"></div><span class="text-[10px] text-success font-bold uppercase tracking-widest">Optimal</span>`;
     }
+  }
+
+  if (activeExplorerUnit) {
+    const activeVal = activeExplorerUnit === 'cpu' ? cpuValRaw : 
+                      activeExplorerUnit === 'ram' ? ramValRaw : 
+                      activeExplorerUnit === 'temp' ? tempValRaw : 
+                      linkValRaw;
+    updateModalValues(activeExplorerUnit, activeVal);
+    renderLogRows(activeExplorerUnit);
+    
+    const canvas = document.getElementById('telemetry-chart');
+    const color = getUnitColor(activeExplorerUnit);
+    const unitText = activeExplorerUnit === 'cpu' ? '%' : 
+                     activeExplorerUnit === 'ram' ? '%' : 
+                     activeExplorerUnit === 'temp' ? '°C' : '%';
+    drawChart(canvas, telemetryHistory[activeExplorerUnit], color, unitText);
   }
 }
 
@@ -382,11 +819,9 @@ function runConnectionSequence() {
 
   window.bridgeLockedGreen = false;
 
-  // Step 1: Offline (Red) - Initial State
   updateConnectionUI('failed'); 
   
   setTimeout(() => {
-    // Step 2: Handshake (Yellow) - After 1.2s
     if (badge) {
       badge.innerHTML = `
         <span class="w-2.5 h-2.5 rounded-full bg-warning animate-pulse shadow-[0_0_8px_rgba(255,193,7,0.4)]"></span>
@@ -397,7 +832,6 @@ function runConnectionSequence() {
   }, 1200);
 
   setTimeout(() => {
-    // Step 3: Connected (Green) - Final State after 2.8s
     updateConnectionUI('connected');
   }, 2800);
 }

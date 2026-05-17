@@ -3,6 +3,8 @@
 // Premium code editor featuring auto-popup preview & ZIP exporter
 // ═══════════════════════════════════════════════
 
+import { api } from '../api.js';
+
 const projectFiles = {
   'index.ts': {
     name: 'index.ts',
@@ -176,6 +178,7 @@ An AI-native autonomous agent powered by Arora OS.
 Click **Run** to start the bun server at port 3000.`
 };
 
+let activeTabs = ['index.ts', 'style.css'];
 let activeTab = 'index.ts';
 let isEngineRunning = false;
 
@@ -189,57 +192,106 @@ export function renderEditorView() {
   `;
 }
 
+function renderTabsHtml() {
+  return activeTabs.map(k => {
+    const file = projectFiles[k] || { name: k, icon: 'insert_drive_file', color: 'text-on-surface-variant' };
+    const isCurrent = activeTab === k;
+    if (isCurrent) {
+      return `
+        <div data-tab="${k}" class="editor-tab active flex items-center gap-2 px-4 py-2.5 bg-white border-t-2 border-tertiary border-r border-outline-variant/20 text-on-surface min-w-max cursor-pointer">
+          <span class="material-symbols-outlined text-[14px] text-tertiary">${file.icon || 'insert_drive_file'}</span>
+          <span class="text-[14px] font-medium">${k}</span>
+          <button data-close-tab="${k}" class="ml-2 text-on-surface-variant hover:text-on-surface rounded-full p-0.5 hover:bg-surface-variant flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">close</span></button>
+        </div>`;
+    } else {
+      return `
+        <div data-tab="${k}" class="editor-tab flex items-center gap-2 px-4 py-2.5 border-r border-outline-variant/20 text-on-surface-variant hover:bg-white hover:text-on-surface min-w-max cursor-pointer transition-colors">
+          <span class="material-symbols-outlined text-[14px] ${file.color || 'text-on-surface-variant'}">${file.icon || 'insert_drive_file'}</span>
+          <span class="text-[14px]">${k}</span>
+          <button data-close-tab="${k}" class="ml-2 text-on-surface-variant hover:text-on-surface rounded-full p-0.5 hover:bg-surface-variant flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">close</span></button>
+        </div>`;
+    }
+  }).join('');
+}
+
 function fileExplorer() {
+  const fileKeys = Object.keys(projectFiles);
+  const srcFiles = fileKeys.filter(k => k !== 'package.json' && k !== 'README.md');
+  const rootFiles = fileKeys.filter(k => k === 'package.json' || k === 'README.md');
+
+  const srcFilesHtml = srcFiles.map(k => {
+    const file = projectFiles[k];
+    const isCurrent = activeTab === k;
+    if (isCurrent) {
+      return `
+        <div data-file="${k}" class="explorer-file flex items-center justify-between px-2 py-1.5 text-tertiary bg-white/60 shadow-sm rounded-lg cursor-pointer relative transition-all">
+          <div class="absolute -left-3 w-1.5 h-1.5 rounded-full bg-tertiary ai-active-dot"></div>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[14px] text-tertiary">${file.icon || 'insert_drive_file'}</span>
+            <span class="text-[14px] font-medium">${k}</span>
+          </div>
+          <div class="flex items-end gap-[1px] h-3 opacity-60">
+            <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:40%"></div>
+            <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:80%;animation-delay:.2s"></div>
+            <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:60%;animation-delay:.4s"></div>
+          </div>
+        </div>`;
+    } else {
+      return `
+        <div data-file="${k}" class="explorer-file flex items-center px-2 py-1.5 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all">
+          <span class="material-symbols-outlined text-[14px] ${file.color || 'text-on-surface-variant'} mr-2">${file.icon || 'insert_drive_file'}</span>
+          <span class="text-[14px]">${k}</span>
+        </div>`;
+    }
+  }).join('');
+
+  const rootFilesHtml = rootFiles.map(k => {
+    const file = projectFiles[k];
+    const isCurrent = activeTab === k;
+    if (isCurrent) {
+      return `
+        <div data-file="${k}" class="explorer-file flex items-center justify-between px-2 py-1.5 mt-1 text-tertiary bg-white/60 shadow-sm rounded-lg cursor-pointer relative transition-all">
+          <div class="absolute -left-3 w-1.5 h-1.5 rounded-full bg-tertiary ai-active-dot"></div>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[14px] text-tertiary">${file.icon || 'insert_drive_file'}</span>
+            <span class="text-[14px] font-medium">${k}</span>
+          </div>
+          <div class="flex items-end gap-[1px] h-3 opacity-60">
+            <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:40%"></div>
+            <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:80%;animation-delay:.2s"></div>
+            <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:60%;animation-delay:.4s"></div>
+          </div>
+        </div>`;
+    } else {
+      return `
+        <div data-file="${k}" class="explorer-file flex items-center px-2 py-1.5 mt-1 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all">
+          <span class="material-symbols-outlined text-[14px] ${file.color || 'text-on-surface-variant'} mr-2">${file.icon || 'insert_drive_file'}</span>
+          <span class="text-[14px]">${k}</span>
+        </div>`;
+    }
+  }).join('');
+
   return `
     <aside class="hidden lg:flex flex-col w-56 glass-panel rounded-xl overflow-hidden shrink-0">
       <div class="p-3 border-b border-white/20 bg-white/30 flex justify-between items-center">
         <span class="text-[10px] uppercase text-on-surface-variant tracking-wider font-bold">Files</span>
         <div class="flex gap-1.5 items-center">
           <span id="download-zip-btn" class="material-symbols-outlined text-[16px] text-on-surface-variant cursor-pointer hover:text-on-surface" title="Download ZIP file">download</span>
-          <span class="material-symbols-outlined text-[14px] text-on-surface-variant cursor-pointer hover:text-on-surface">note_add</span>
+          <span id="add-file-btn" class="material-symbols-outlined text-[14px] text-on-surface-variant cursor-pointer hover:text-on-surface" title="Add new file">note_add</span>
           <span class="material-symbols-outlined text-[14px] text-on-surface-variant cursor-pointer hover:text-on-surface">create_new_folder</span>
         </div>
       </div>
-      <div class="flex-1 overflow-y-auto py-2 px-2">
-        <div class="flex items-center px-2 py-1.5 text-on-surface hover:bg-white/50 rounded-lg cursor-pointer">
+      <div class="flex-1 overflow-y-auto py-2 px-2" id="explorer-files-container">
+        <div class="flex items-center px-2 py-1.5 text-on-surface hover:bg-white/50 rounded-lg cursor-pointer select-none">
           <span class="material-symbols-outlined text-[16px] text-on-surface-variant mr-1">keyboard_arrow_down</span>
           <span class="material-symbols-outlined text-[16px] text-on-surface-variant mr-2">folder</span>
           <span class="text-[14px] font-medium">src</span>
         </div>
-        <div class="pl-6 flex flex-col gap-0.5">
-          <!-- index.ts -->
-          <div data-file="index.ts" class="explorer-file flex items-center justify-between px-2 py-1.5 text-tertiary bg-white/60 shadow-sm rounded-lg cursor-pointer relative transition-all">
-            <div class="absolute -left-3 w-1.5 h-1.5 rounded-full bg-tertiary ai-active-dot"></div>
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-[14px] text-tertiary">data_object</span>
-              <span class="text-[14px] font-medium">index.ts</span>
-            </div>
-            <div class="flex items-end gap-[1px] h-3 opacity-60">
-              <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:40%"></div>
-              <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:80%;animation-delay:.2s"></div>
-              <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:60%;animation-delay:.4s"></div>
-            </div>
-          </div>
-          <!-- style.css -->
-          <div data-file="style.css" class="explorer-file flex items-center px-2 py-1.5 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all">
-            <span class="material-symbols-outlined text-[14px] text-indigo-400 mr-2">css</span>
-            <span class="text-[14px]">style.css</span>
-          </div>
-          <!-- index.html -->
-          <div data-file="index.html" class="explorer-file flex items-center px-2 py-1.5 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all">
-            <span class="material-symbols-outlined text-[14px] text-orange-400 mr-2">html</span>
-            <span class="text-[14px]">index.html</span>
-          </div>
+        <div class="pl-6 flex flex-col gap-0.5" id="explorer-src-files">
+          ${srcFilesHtml}
         </div>
-        <!-- package.json -->
-        <div data-file="package.json" class="explorer-file flex items-center px-2 py-1.5 mt-1 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all">
-          <span class="material-symbols-outlined text-[14px] text-on-surface-variant mr-2">description</span>
-          <span class="text-[14px]">package.json</span>
-        </div>
-        <!-- README.md -->
-        <div data-file="README.md" class="explorer-file flex items-center px-2 py-1.5 mt-1 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all">
-          <span class="material-symbols-outlined text-[14px] text-on-surface-variant mr-2">description</span>
-          <span class="text-[14px]">README.md</span>
+        <div id="explorer-root-files" class="flex flex-col gap-0.5 mt-1.5">
+          ${rootFilesHtml}
         </div>
       </div>
       <div class="p-2 border-t border-white/20 bg-white/20">
@@ -256,18 +308,10 @@ function fileExplorer() {
 function codeEditor() {
   return `
     <div class="flex-1 flex flex-col min-w-0 bg-white/90 rounded-xl shadow-sm border border-outline-variant/30 overflow-hidden relative glass-panel">
-      <div class="flex border-b border-outline-variant/20 bg-surface-container-low/50 overflow-x-auto items-center pr-4 shrink-0">
+      <div class="flex border-b border-outline-variant/20 bg-surface-container-low/50 items-center justify-between pr-4 shrink-0 select-none w-full">
         <!-- Editor Tabs -->
-        <div class="flex flex-1" id="editor-tabs">
-          <div data-tab="index.ts" class="editor-tab active flex items-center gap-2 px-4 py-2.5 bg-white border-t-2 border-tertiary border-r border-outline-variant/20 text-on-surface min-w-max cursor-pointer">
-            <span class="material-symbols-outlined text-[14px] text-tertiary">data_object</span>
-            <span class="text-[14px] font-medium">index.ts</span>
-            <button class="ml-2 text-on-surface-variant hover:text-on-surface rounded-full p-0.5 hover:bg-surface-variant"><span class="material-symbols-outlined text-[14px]">close</span></button>
-          </div>
-          <div data-tab="style.css" class="editor-tab flex items-center gap-2 px-4 py-2.5 border-r border-outline-variant/20 text-on-surface-variant hover:bg-white hover:text-on-surface min-w-max cursor-pointer transition-colors">
-            <span class="material-symbols-outlined text-[14px] text-indigo-400">css</span>
-            <span class="text-[14px]">style.css</span>
-          </div>
+        <div class="flex flex-1 overflow-x-auto scrollbar-none mr-2" id="editor-tabs">
+          ${renderTabsHtml()}
         </div>
         
         <!-- Run & Preview dedicated action buttons -->
@@ -301,18 +345,18 @@ function docPanel() {
         <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
           <span class="material-symbols-outlined text-[18px]">check_circle</span>
         </div>
-        <div class="relative z-10">
+        <div class="relative z-10 select-none">
           <h3 class="text-[14px] text-on-surface font-bold mb-0.5">Deployment Successful</h3>
           <p class="text-[12px] text-on-surface-variant">v1.4.2 deployed to edge</p>
           <a class="text-[12px] text-tertiary mt-1 inline-flex items-center gap-1 hover:underline font-medium" href="#">View Logs <span class="material-symbols-outlined text-[12px]">open_in_new</span></a>
         </div>
       </div>
       <div class="flex-1 glass-panel rounded-xl overflow-hidden flex flex-col">
-        <div class="px-4 py-3 border-b border-white/20 bg-white/30 flex justify-between items-center">
+        <div class="px-4 py-3 border-b border-white/20 bg-white/30 flex justify-between items-center select-none">
           <h4 class="text-[10px] uppercase text-on-surface-variant tracking-wider font-bold">Documentation</h4>
           <button class="text-on-surface-variant hover:text-on-surface"><span class="material-symbols-outlined text-[14px]">edit</span></button>
         </div>
-        <div class="flex-1 overflow-y-auto p-4">
+        <div class="flex-1 overflow-y-auto p-4 select-none">
           <h1 class="text-[18px] font-bold mb-2 text-on-surface leading-tight">Agent Initialization</h1>
           <p class="text-on-surface-variant mb-4 text-[14px] leading-relaxed">This module sets up the primary AI assistant instance using Bun's native HTTP server.</p>
           <h3 class="text-[14px] font-bold mt-4 mb-2 text-on-surface uppercase tracking-wide">Configuration</h3>
@@ -331,49 +375,303 @@ function docPanel() {
 }
 
 // ═══════════════════════════════════════════════
-// VIEW INITIALIZER
+// DYNAMIC EVENT BINDINGS VIA DELEGATION
 // ═══════════════════════════════════════════════
-export function initEditorView() {
-  // 1. Initial Render
-  switchTab(activeTab);
+export function bindEditorDelegatedEvents() {
+  const tabsContainer = document.getElementById('editor-tabs');
+  if (tabsContainer && !tabsContainer.dataset.delegated) {
+    tabsContainer.dataset.delegated = 'true';
+    tabsContainer.addEventListener('click', (e) => {
+      const closeBtn = e.target.closest('[data-close-tab]');
+      if (closeBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const tabName = closeBtn.dataset.closeTab;
+        closeTab(tabName);
+        return;
+      }
 
-  // 2. Setup run button state
-  updateRunBtnUI();
-
-  // 3. Tab switching listeners
-  document.querySelectorAll('.editor-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const tabName = tab.dataset.tab;
-      switchTab(tabName);
+      const tab = e.target.closest('.editor-tab');
+      if (tab) {
+        const tabName = tab.dataset.tab;
+        switchTab(tabName);
+      }
     });
-  });
+  }
 
-  // 4. File Explorer switching listeners
-  document.querySelectorAll('.explorer-file').forEach(fileEl => {
-    fileEl.addEventListener('click', () => {
-      const fileName = fileEl.dataset.file;
-      
-      // Update explorer style classes
-      document.querySelectorAll('.explorer-file').forEach(el => {
-        el.className = "explorer-file flex items-center px-2 py-1.5 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all";
-        const dot = el.querySelector('.ai-active-dot');
-        if (dot) dot.remove();
-        const pulse = el.querySelector('.h-3');
-        if (pulse) pulse.remove();
-      });
+  const explorerContainer = document.getElementById('explorer-src-files')?.closest('aside');
+  if (explorerContainer && !explorerContainer.dataset.delegated) {
+    explorerContainer.dataset.delegated = 'true';
+    explorerContainer.addEventListener('click', (e) => {
+      const fileEl = e.target.closest('.explorer-file');
+      if (fileEl) {
+        e.preventDefault();
+        e.stopPropagation();
+        const fileName = fileEl.dataset.file;
+        
+        if (!activeTabs.includes(fileName)) {
+          activeTabs.push(fileName);
+        }
+        
+        switchTab(fileName);
+      }
+    });
+  }
+}
 
-      fileEl.className = "explorer-file flex items-center justify-between px-2 py-1.5 text-tertiary bg-white/60 shadow-sm rounded-lg cursor-pointer relative transition-all";
-      fileEl.insertAdjacentHTML('afterbegin', '<div class="absolute -left-3 w-1.5 h-1.5 rounded-full bg-tertiary ai-active-dot"></div>');
-      fileEl.insertAdjacentHTML('beforeend', `
+function switchTab(tabName) {
+  activeTab = tabName;
+  
+  const tabsContainer = document.getElementById('editor-tabs');
+  if (tabsContainer) {
+    tabsContainer.innerHTML = renderTabsHtml();
+  }
+
+  document.querySelectorAll('.explorer-file').forEach(el => {
+    const k = el.dataset.file;
+    const file = projectFiles[k];
+    const isCurrent = k === tabName;
+    
+    const dot = el.querySelector('.ai-active-dot');
+    if (dot) dot.remove();
+    const pulse = el.querySelector('.h-3');
+    if (pulse) pulse.remove();
+
+    if (isCurrent) {
+      el.className = "explorer-file flex items-center justify-between px-2 py-1.5 text-tertiary bg-white/60 shadow-sm rounded-lg cursor-pointer relative transition-all";
+      el.insertAdjacentHTML('afterbegin', '<div class="absolute -left-3 w-1.5 h-1.5 rounded-full bg-tertiary ai-active-dot"></div>');
+      el.insertAdjacentHTML('beforeend', `
         <div class="flex items-end gap-[1px] h-3 opacity-60">
           <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:40%"></div>
           <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:80%;animation-delay:.2s"></div>
           <div class="w-1 bg-tertiary/60 rounded-t-sm animate-pulse" style="height:60%;animation-delay:.4s"></div>
         </div>
       `);
+    } else {
+      el.className = "explorer-file flex items-center px-2 py-1.5 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all";
+    }
+  });
 
-      switchTab(fileName);
-    });
+  if (activeTab) {
+    renderCodeTab(tabName);
+  }
+
+  bindEditorDelegatedEvents();
+}
+
+function closeTab(tabName) {
+  activeTabs = activeTabs.filter(t => t !== tabName);
+  
+  if (activeTab === tabName) {
+    if (activeTabs.length > 0) {
+      activeTab = activeTabs[activeTabs.length - 1];
+    } else {
+      activeTab = null;
+    }
+  }
+  
+  const tabsContainer = document.getElementById('editor-tabs');
+  if (tabsContainer) {
+    tabsContainer.innerHTML = renderTabsHtml();
+  }
+  
+  if (activeTab) {
+    switchTab(activeTab);
+  } else {
+    const container = document.getElementById('editor-code-container');
+    if (container) {
+      container.innerHTML = `
+        <div class="flex-1 flex flex-col items-center justify-center text-on-surface-variant/60 p-8 select-none">
+          <span class="material-symbols-outlined text-[48px] opacity-40 mb-3 select-none">folder_open</span>
+          <p class="text-[14px]">No files open in editor. Select a file from the sidebar explorer.</p>
+        </div>`;
+    }
+    bindEditorDelegatedEvents();
+  }
+}
+
+// Helper to render explorer UI dynamically
+export function renderExplorerUI() {
+  const srcFilesContainer = document.getElementById('explorer-src-files');
+  const rootFilesContainer = document.getElementById('explorer-root-files');
+  
+  if (srcFilesContainer && rootFilesContainer) {
+    const fileKeys = Object.keys(projectFiles);
+    const srcFiles = fileKeys.filter(k => k !== 'package.json' && k !== 'README.md');
+    const rootFiles = fileKeys.filter(k => k === 'package.json' || k === 'README.md');
+
+    srcFilesContainer.innerHTML = srcFiles.map(k => {
+      const file = projectFiles[k];
+      return `
+        <div data-file="${k}" class="explorer-file flex items-center px-2 py-1.5 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all">
+          <span class="material-symbols-outlined text-[14px] ${file.color || 'text-on-surface-variant'} mr-2">${file.icon || 'insert_drive_file'}</span>
+          <span class="text-[14px]">${k}</span>
+        </div>`;
+    }).join('');
+
+    rootFilesContainer.innerHTML = rootFiles.map(k => {
+      const file = projectFiles[k];
+      return `
+        <div data-file="${k}" class="explorer-file flex items-center px-2 py-1.5 mt-1 text-on-surface-variant hover:bg-white/50 rounded-lg cursor-pointer transition-all">
+          <span class="material-symbols-outlined text-[14px] ${file.color || 'text-on-surface-variant'} mr-2">${file.icon || 'insert_drive_file'}</span>
+          <span class="text-[14px]">${k}</span>
+        </div>`;
+    }).join('');
+  }
+}
+
+// Asynchronously load files generated by AI agents from the backend results
+export async function loadActiveProjectFiles(activeId) {
+  try {
+    const results = await api.getResult(activeId);
+    if (!results) return;
+
+    // Clear existing
+    for (const key in projectFiles) delete projectFiles[key];
+    for (const key in projectRawFiles) delete projectRawFiles[key];
+    activeTabs = [];
+
+    function addFile(name, rawContent) {
+      const ext = name.split('.').pop().toLowerCase();
+      let icon = 'description';
+      let color = 'text-on-surface-variant';
+      let lang = 'typescript';
+      
+      if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx') {
+        icon = ext.endsWith('x') ? 'code' : 'data_object';
+        color = 'text-tertiary';
+        lang = ext.startsWith('t') ? 'typescript' : 'javascript';
+      } else if (ext === 'css') {
+        icon = 'css';
+        color = 'text-indigo-400';
+        lang = 'css';
+      } else if (ext === 'html') {
+        icon = 'html';
+        color = 'text-orange-400';
+        lang = 'html';
+      } else if (ext === 'json') {
+        icon = 'description';
+        color = 'text-on-surface-variant';
+        lang = 'json';
+      } else if (ext === 'md') {
+        icon = 'description';
+        color = 'text-on-surface-variant';
+        lang = 'markdown';
+      }
+
+      function escapeHtml(text) {
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      const lines = rawContent.split('\n');
+      const linesCount = lines.length;
+      
+      let highlighted = escapeHtml(rawContent);
+      
+      // 1. Highlight Strings (do this before keywords to avoid matching quote characters in HTML span attributes)
+      highlighted = highlighted.replace(/(["'])(.*?)\1/g, `<span class="text-emerald-600">"$2"</span>`);
+
+      // 2. Highlight Comments
+      highlighted = highlighted.replace(/(\/\/.*)/g, `<span class="text-on-surface-variant italic">$1</span>`);
+
+      // 3. Highlight Keywords (using tag-ignoring regex to ensure we never replace attributes of our HTML tags)
+      const keywords = ['import', 'export', 'default', 'function', 'const', 'let', 'var', 'return', 'async', 'await', 'from', 'if', 'else', 'new', 'class', 'port', 'fetch'];
+      highlighted = highlighted.replace(/(<[^>]+>)|(\b\w+\b)/g, (match, tag, word) => {
+        if (tag) return tag;
+        if (keywords.includes(word)) {
+          return `<span class="text-indigo-600 font-semibold">${word}</span>`;
+        }
+        return word;
+      });
+
+      projectFiles[name] = {
+        name: name,
+        lang: lang,
+        icon: icon,
+        color: color,
+        linesCount: linesCount,
+        content: highlighted
+      };
+
+      const rawPath = (name === 'package.json' || name === 'README.md') ? name : `src/${name}`;
+      projectRawFiles[rawPath] = rawContent;
+
+      activeTabs.push(name);
+    }
+
+    // 1. Process Frontend Components
+    if (results.frontend && Array.isArray(results.frontend.components)) {
+      results.frontend.components.forEach(comp => {
+        if (comp.name && comp.code) {
+          addFile(comp.name, comp.code);
+        }
+      });
+    }
+
+    // 2. Process Backend Code
+    if (results.backend) {
+      if (results.backend.backend_code) {
+        addFile('server.py', results.backend.backend_code);
+      }
+      if (results.backend.database_schema) {
+        addFile('schema.sql', results.backend.database_schema);
+      }
+    }
+
+    // 3. Process Docs
+    if (results.docs) {
+      if (results.docs.docs) {
+        addFile('README.md', results.docs.docs);
+      } else if (typeof results.docs === 'string') {
+        addFile('README.md', results.docs);
+      }
+    }
+
+    // If still empty, add default
+    if (activeTabs.length === 0) {
+      addFile('README.md', '# Generated Arora Project\nNo files were generated.');
+    }
+
+    activeTab = activeTabs[0];
+
+    // Re-render explorer UI list
+    renderExplorerUI();
+
+  } catch (error) {
+    console.error("Failed to load project results:", error);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// VIEW INITIALIZER
+// ═══════════════════════════════════════════════
+export async function initEditorView() {
+  const activeId = sessionStorage.getItem('arora_active_project_id');
+  if (activeId) {
+    showToast("Syncing agent workspace files...", "success");
+    await loadActiveProjectFiles(activeId);
+  }
+
+  // 1. Initial Render
+  switchTab(activeTab);
+
+  // 2. Setup run button state
+  updateRunBtnUI();
+
+  // 3. Bind Editor Event Listeners via delegation
+  bindEditorDelegatedEvents();
+
+  // 4. Bind Add File Click Action
+  const addFileBtn = document.getElementById('add-file-btn');
+  addFileBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openCreateFileModal();
   });
 
   // 5. Preview dedicated button click
@@ -437,22 +735,6 @@ function updateRunBtnUI() {
   }
 }
 
-function switchTab(tabName) {
-  activeTab = tabName;
-  const container = document.getElementById('editor-code-container');
-  if (!container) return;
-
-  // Update tabs header styling
-  document.querySelectorAll('.editor-tab').forEach(tab => {
-    const isCurrent = tab.dataset.tab === tabName;
-    tab.className = isCurrent
-      ? "editor-tab active flex items-center gap-2 px-4 py-2.5 bg-white border-t-2 border-tertiary border-r border-outline-variant/20 text-on-surface min-w-max cursor-pointer"
-      : "editor-tab flex items-center gap-2 px-4 py-2.5 border-r border-outline-variant/20 text-on-surface-variant hover:bg-white hover:text-on-surface min-w-max cursor-pointer transition-colors";
-  });
-
-  renderCodeTab(tabName);
-}
-
 function renderCodeTab(fileName) {
   const container = document.getElementById('editor-code-container');
   const file = projectFiles[fileName] || projectFiles['index.ts'];
@@ -464,6 +746,192 @@ function renderCodeTab(fileName) {
     <div class="text-outline-variant/60 p-4 pr-0 text-right select-none flex flex-col w-8 shrink-0 code-font text-[14px] leading-[1.7]">${linesHtml}</div>
     <div class="flex-1 p-4 whitespace-pre text-on-surface overflow-x-auto code-font text-[14px] leading-[1.7]">${file.content}</div>
   `;
+}
+
+// ═══════════════════════════════════════════════
+// NEW FILE CREATION MODAL
+// ═══════════════════════════════════════════════
+function openCreateFileModal() {
+  const modalHtml = `
+    <div id="create-file-modal-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
+      <div class="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 flex flex-col transform scale-95 transition-all duration-300" id="create-file-modal-window">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+            <span class="material-symbols-outlined">note_add</span>
+          </div>
+          <div>
+            <h3 class="text-[16px] font-bold text-on-surface font-sans">Create New File</h3>
+            <p class="text-[12px] text-on-surface-variant font-sans">Add a code file to your project</p>
+          </div>
+        </div>
+        
+        <div class="mb-5">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1.5 font-sans">File Name</label>
+          <input type="text" id="new-file-name-input" placeholder="e.g. App.tsx, utils.js, styles.css" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[14px] text-on-surface placeholder:text-gray-400 outline-none focus:border-emerald-600 transition-all font-sans" autocomplete="off" />
+          <span id="create-file-error" class="hidden text-[11px] text-error mt-1.5 font-medium font-sans"></span>
+        </div>
+        
+        <div class="flex gap-3 justify-end">
+          <button id="cancel-create-file" class="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-[13px] font-bold rounded-xl text-on-surface-variant font-sans transition-all">Cancel</button>
+          <button id="confirm-create-file" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-bold rounded-xl shadow-sm font-sans transition-all">Create File</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  
+  const input = document.getElementById('new-file-name-input');
+  input?.focus();
+
+  // Scale in modal window smoothly
+  setTimeout(() => {
+    const win = document.getElementById('create-file-modal-window');
+    if (win) {
+      win.classList.remove('scale-95');
+      win.classList.add('scale-100');
+    }
+  }, 10);
+
+  // Bind modal button elements
+  const cancelBtn = document.getElementById('cancel-create-file');
+  cancelBtn?.addEventListener('click', closeCreateFileModal);
+
+  const overlay = document.getElementById('create-file-modal-overlay');
+  overlay?.addEventListener('click', (e) => {
+    if (e.target === overlay) closeCreateFileModal();
+  });
+
+  const confirmBtn = document.getElementById('confirm-create-file');
+  confirmBtn?.addEventListener('click', handleSubmit);
+  
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleSubmit();
+    if (e.key === 'Escape') closeCreateFileModal();
+  });
+
+  function handleSubmit() {
+    const fileName = input.value.trim();
+    const errorEl = document.getElementById('create-file-error');
+    if (!errorEl) return;
+
+    if (!fileName) {
+      errorEl.textContent = "Please enter a valid filename.";
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    if (projectFiles[fileName]) {
+      errorEl.textContent = "A file with this name already exists.";
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    const isValid = /^[a-zA-Z0-9_\-\.\/]+$/.test(fileName);
+    if (!isValid) {
+      errorEl.textContent = "Filename contains invalid characters.";
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    createFileInWorkspace(fileName);
+    closeCreateFileModal();
+  }
+}
+
+function closeCreateFileModal() {
+  const overlay = document.getElementById('create-file-modal-overlay');
+  const win = document.getElementById('create-file-modal-window');
+  if (win) {
+    win.classList.remove('scale-100');
+    win.classList.add('scale-95');
+  }
+  setTimeout(() => {
+    overlay?.remove();
+  }, 150);
+}
+
+function createFileInWorkspace(fileName) {
+  // Clean filename path prefixes if user types them explicitly
+  const cleanName = fileName.replace(/^src\//, '');
+  const ext = cleanName.split('.').pop().toLowerCase();
+  
+  let icon = 'description';
+  let color = 'text-on-surface-variant';
+  let lang = 'typescript';
+  let linesCount = 5;
+  let rawContent = `// New file: ${cleanName}`;
+  let highlightedContent = `<span class="text-on-surface-variant italic">// New file: ${cleanName}</span>`;
+
+  if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx') {
+    icon = ext.endsWith('x') ? 'code' : 'data_object';
+    color = 'text-tertiary';
+    lang = ext.startsWith('t') ? 'typescript' : 'javascript';
+    if (ext === 'tsx' || ext === 'jsx') {
+      rawContent = `export default function App() {\n  return (\n    <div className="p-6 text-center">\n      <h1>Hello from ${cleanName}!</h1>\n    </div>\n  );\n}`;
+      highlightedContent = `<span class="text-indigo-600">export default function</span> <span class="text-tertiary">App</span>() {\n  <span class="text-indigo-600">return</span> (\n    <span class="text-emerald-600">&lt;div className="p-6 text-center"&gt;</span>\n      <span class="text-emerald-600">&lt;h1&gt;Hello from ${cleanName}!&lt;/h1&gt;</span>\n    <span class="text-emerald-600">&lt;/div&gt;</span>\n  );\n}`;
+      linesCount = 7;
+    } else {
+      rawContent = `export function init() {\n  console.log("Initialized ${cleanName}");\n}`;
+      highlightedContent = `<span class="text-indigo-600">export function</span> <span class="text-tertiary">init</span>() {\n  <span class="text-tertiary">console.log</span>(<span class="text-emerald-600">"Initialized ${cleanName}"</span>);\n}`;
+      linesCount = 3;
+    }
+  } else if (ext === 'css') {
+    icon = 'css';
+    color = 'text-indigo-400';
+    lang = 'css';
+    rawContent = `/* Stylesheet: ${cleanName} */\n.container {\n  padding: 20px;\n}`;
+    highlightedContent = `<span class="text-on-surface-variant italic">/* Stylesheet: ${cleanName} */</span>\n<span class="text-indigo-600">.container</span> {\n  <span class="text-tertiary">padding</span>: <span class="text-emerald-600">20px</span>;\n}`;
+    linesCount = 4;
+  } else if (ext === 'html') {
+    icon = 'html';
+    color = 'text-orange-400';
+    lang = 'html';
+    rawContent = `<!DOCTYPE html>\n<html>\n<body>\n  <h2>${cleanName}</h2>\n</body>\n</html>`;
+    highlightedContent = `<span class="text-indigo-600">&lt;!DOCTYPE html&gt;</span>\n<span class="text-indigo-600">&lt;html&gt;</span>\n<span class="text-indigo-600">&lt;body&gt;</span>\n  <span class="text-indigo-600">&lt;h2&gt;</span>${cleanName}<span class="text-indigo-600">&lt;/h2&gt;</span>\n<span class="text-indigo-600">&lt;/body&gt;</span>\n<span class="text-indigo-600">&lt;/html&gt;</span>`;
+    linesCount = 6;
+  } else if (ext === 'json') {
+    icon = 'description';
+    color = 'text-on-surface-variant';
+    lang = 'json';
+    rawContent = `{\n  "name": "${cleanName.split('.')[0]}"\n}`;
+    highlightedContent = `<span class="text-indigo-600">{</span>\n  <span class="text-tertiary">"name"</span>: <span class="text-emerald-600">"${cleanName.split('.')[0]}"</span>\n<span class="text-indigo-600">}</span>`;
+    linesCount = 3;
+  } else if (ext === 'md') {
+    icon = 'description';
+    color = 'text-on-surface-variant';
+    lang = 'markdown';
+    rawContent = `# ${cleanName}\n\nDocumentation for this component.`;
+    highlightedContent = `<span class="text-indigo-600"># ${cleanName}</span>\n\nDocumentation for this component.`;
+    linesCount = 3;
+  }
+
+  // 1. Add file model dynamically to projectFiles
+  projectFiles[cleanName] = {
+    name: cleanName,
+    lang: lang,
+    icon: icon,
+    color: color,
+    linesCount: linesCount,
+    content: highlightedContent
+  };
+
+  // 2. Add raw text to projectRawFiles
+  const rawPath = (cleanName === 'package.json' || cleanName === 'README.md') ? cleanName : `src/${cleanName}`;
+  projectRawFiles[rawPath] = rawContent;
+
+  // 3. Auto push to activeTabs
+  if (!activeTabs.includes(cleanName)) {
+    activeTabs.push(cleanName);
+  }
+
+  // 4. Display elegant toast notification
+  showToast(`Created file: ${cleanName}`, "success");
+
+  // 5. Re-render full file explorer components
+  renderExplorerUI();
+
+  // Focus the newly created file tab
+  switchTab(cleanName);
 }
 
 // ═══════════════════════════════════════════════
@@ -610,13 +1078,15 @@ async function downloadFilesAsZip() {
   // Windows Explorer Compatibility: Explicitly create parent subfolder nodes
   const srcFolder = zip.folder("src");
   
-  // Write workspace files into parent directory entries
-  srcFolder.file("index.ts", projectRawFiles['src/index.ts']);
-  srcFolder.file("style.css", projectRawFiles['src/style.css']);
-  srcFolder.file("index.html", projectRawFiles['src/index.html']);
-  
-  zip.file("package.json", projectRawFiles['package.json']);
-  zip.file("README.md", projectRawFiles['README.md']);
+  // Write workspace files dynamically into directory entries
+  for (const rawPath in projectRawFiles) {
+    if (rawPath.startsWith("src/")) {
+      const fileName = rawPath.substring(4);
+      srcFolder.file(fileName, projectRawFiles[rawPath]);
+    } else {
+      zip.file(rawPath, projectRawFiles[rawPath]);
+    }
+  }
   
   try {
     const blob = await zip.generateAsync({ 
