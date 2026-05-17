@@ -310,7 +310,27 @@ export async function handleCommand(input, container) {
     saveHistory();
     renderChat(container, false, false);
   } catch (error) {
-    messageHistory.push({ type: 'ai', icon: 'error', text: `Failed to connect to Arora Prime. Error: ${error.message}` });
+    let errorText = `Failed to connect to Arora Prime. Error: ${error.message}`;
+    if (window.location.protocol === 'https:' && (error.message.includes('fetch') || error.message.includes('Fetch') || error.message.includes('API API Error'))) {
+      errorText += `\n\n<div class="mt-4 p-4 rounded-2xl bg-error-container/10 border border-error/20 text-on-surface text-[13px] leading-relaxed shadow-sm">
+        <div class="flex items-start gap-2.5">
+          <span class="material-symbols-outlined text-error text-[20px] shrink-0">warning</span>
+          <div>
+            <strong class="text-error font-bold block mb-1">Local Backend Connection Blocked (Mixed Content)</strong>
+            You are accessing Arora OS over a secure <strong class="text-tertiary font-bold">HTTPS</strong> connection (${window.location.host}), but your local agent runs over insecure <strong class="text-tertiary font-bold">HTTP</strong> (<code>http://localhost:8000</code>). Browsers block this by default.
+            <div class="flex gap-2.5 mt-3">
+              <a href="http://localhost:5173" class="px-3.5 py-1.5 bg-tertiary hover:bg-on-tertiary-fixed-variant text-on-tertiary rounded-xl font-semibold transition-colors inline-block text-[11px] shadow-sm shadow-tertiary/10">
+                Run App Locally (HTTP) 🚀
+              </a>
+              <button onclick="window.location.href = window.location.href.replace('https:', 'http:')" class="px-3.5 py-1.5 border border-outline-variant hover:bg-surface-variant/40 rounded-xl font-medium transition-colors inline-block text-[11px]">
+                Switch to HTTP
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+    messageHistory.push({ type: 'ai', icon: 'error', text: errorText });
     saveHistory();
     renderChat(container);
   }
@@ -334,7 +354,27 @@ async function handleProjectCreation(input, container) {
     renderChat(container);
     setTimeout(() => navigateTo('execution'), 2000);
   } catch (error) {
-    messageHistory.push({ type: 'ai', icon: 'error', text: `Failed to initiate project. ${error.message}` });
+    let errorText = `Failed to initiate project. ${error.message}`;
+    if (window.location.protocol === 'https:' && (error.message.includes('fetch') || error.message.includes('Fetch'))) {
+      errorText += `\n\n<div class="mt-4 p-4 rounded-2xl bg-error-container/10 border border-error/20 text-on-surface text-[13px] leading-relaxed shadow-sm">
+        <div class="flex items-start gap-2.5">
+          <span class="material-symbols-outlined text-error text-[20px] shrink-0">warning</span>
+          <div>
+            <strong class="text-error font-bold block mb-1">Local Backend Connection Blocked (Mixed Content)</strong>
+            You are accessing Arora OS over a secure <strong class="text-tertiary font-bold">HTTPS</strong> connection (${window.location.host}), but your local agent runs over insecure <strong class="text-tertiary font-bold">HTTP</strong> (<code>http://localhost:8000</code>). Browsers block this by default.
+            <div class="flex gap-2.5 mt-3">
+              <a href="http://localhost:5173" class="px-3.5 py-1.5 bg-tertiary hover:bg-on-tertiary-fixed-variant text-on-tertiary rounded-xl font-semibold transition-colors inline-block text-[11px] shadow-sm shadow-tertiary/10">
+                Run App Locally (HTTP) 🚀
+              </a>
+              <button onclick="window.location.href = window.location.href.replace('https:', 'http:')" class="px-3.5 py-1.5 border border-outline-variant hover:bg-surface-variant/40 rounded-xl font-medium transition-colors inline-block text-[11px]">
+                Switch to HTTP
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+    messageHistory.push({ type: 'ai', icon: 'error', text: errorText });
     saveHistory();
     renderChat(container);
   }
