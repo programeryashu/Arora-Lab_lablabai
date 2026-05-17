@@ -81,5 +81,22 @@ export const api = {
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return await response.json();
+    },
+
+    /**
+     * Save/modify a file in the workspace
+     * @param {string} projectId 
+     * @param {string} filename 
+     * @param {string} content 
+     */
+    async saveFile(projectId, filename, content) {
+        const response = await fetch(`${API_BASE}/save-file`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_id: projectId, filename, content })
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return await response.json();
     }
+
 };

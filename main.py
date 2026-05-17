@@ -294,16 +294,148 @@ async def get_status(project_id: str):
 @app.get("/result/{project_id}")
 async def get_result(project_id: str):
     project = get_project(project_id)
+    
+    # 1. Rebuild or load dynamically from filesystem if project is not in memory
+    from core.storage import BASE_PROJECTS_DIR
+    project_path = os.path.join(BASE_PROJECTS_DIR, project_id)
+    
+    if not os.path.exists(project_path):
+        if not project:
+            raise HTTPException(status_code=404, detail="Project workspace folder not found")
+            
+    # 2. Scan and read actual project files from disk to ensure 100% sync
+    frontend_components = []
+    frontend_path = os.path.join(project_path, "frontend", "src")
+    if os.path.exists(frontend_path):
+        for f in os.listdir(frontend_path):
+            fpath = os.path.join(frontend_path, f)
+            if os.path.isfile(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as file_handle:
+                        frontend_components.append({"name": f, "code": file_handle.read()})
+                except Exception as e:
+                    print(f"Error reading frontend file {f}: {e}")
+                    
+    backend_components = []
+    backend_path = os.path.join(project_path, "backend")
+    if os.path.exists(backend_path):
+        for f in os.listdir(backend_path):
+            fpath = os.path.join(backend_path, f)
+            if os.path.isfile(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as file_handle:
+                        backend_components.append({"name": f, "code": file_handle.read()})
+                except Exception as e:
+                    print(f"Error reading backend file {f}: {e}")
+                    
+    readme_content = ""
+    readme_path = os.path.join(project_path, "README.md")
+    if os.path.exists(readme_path):
+        try:
+            with open(readme_path, "r", encoding="utf-8") as file_handle:
+                readme_content = file_handle.read()
+        except Exception as e:
+            print(f"Error reading README.md: {e}")
+            
+    # If project is not in memory, initialize it
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        from core.state import create_project
+        create_project(project_id)
+        project = get_project(project_id)
+        project["status"] = "completed"
+        project["current_agent"] = "completed"
         
-    res = project["results"]
+    # Synchronize and save inside project state
+    project["results"]["frontend"] = {"components": frontend_components}
+    project["results"]["backend"] = {"components": backend_components}
+    project["results"]["docs"] = {"docs": readme_content}
+    
     return {
         "status": project["status"],
-        "frontend": res.get("frontend"),
-        "backend": res.get("backend"),
-        "docs": res.get("docs")
+        "frontend": project["results"]["frontend"],
+        "backend": project["results"]["backend"],
+        "docs": project["results"]["docs"]
     }
+
+
+class SaveFileRequest(BaseModel):
+    project_id: str
+    filename: str
+    content: str
+
+@app.post("/save-file")
+async def save_file(request: SaveFileRequest):
+    project_id = request.project_id
+    filename = request.filename
+    content = request.content
+    
+    project = get_project(project_id)
+    if not project:
+        # If project is not found in memory (e.g. server reloaded), create a stub
+        from core.state import create_project
+        create_project(project_id)
+        project = get_project(project_id)
+    
+    # 1. Determine folder path and key dynamically
+    if filename.endswith(".jsx") or filename.endswith(".js") or filename.endswith(".css") or filename.endswith(".html") or filename == "index.html":
+        sub_folder = os.path.join("frontend", "src")
+        res_key = "frontend"
+    elif filename.endswith(".py") or filename.endswith(".sql"):
+        sub_folder = "backend"
+        res_key = "backend"
+    elif filename == "README.md" or filename == "package.json":
+        sub_folder = ""
+        res_key = "docs"
+    else:
+        # Fallback to general workspace
+        sub_folder = ""
+        res_key = "docs"
+        
+    # 2. Write to local filesystem
+    from core.storage import safe_write_file, BASE_PROJECTS_DIR
+    filepath = os.path.join(BASE_PROJECTS_DIR, project_id, sub_folder, filename)
+    
+    try:
+        safe_write_file(filepath, content)
+        print(f"[API_SAVE] Successfully wrote file to disk: {filepath}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write file to disk: {str(e)}")
+        
+    # 3. Synchronize in-memory result state
+    results = project["results"]
+    if results.get(res_key) is None:
+        results[res_key] = {}
+        
+    if res_key == "frontend":
+        components = results["frontend"].setdefault("components", [])
+        updated = False
+        for comp in components:
+            if comp.get("name") == filename:
+                comp["code"] = content
+                updated = True
+                break
+        if not updated:
+            components.append({"name": filename, "code": content})
+            
+    elif res_key == "backend":
+        components = results["backend"].setdefault("components", [])
+        updated = False
+        for comp in components:
+            if comp.get("name") == filename:
+                comp["code"] = content
+                updated = True
+                break
+        if not updated:
+            components.append({"name": filename, "code": content})
+            
+    elif res_key == "docs":
+        results["docs"]["docs"] = content
+        
+    return {
+        "status": "success",
+        "message": f"File '{filename}' successfully saved and synchronized in workspace."
+    }
+
 
 @app.websocket("/ws/bridge")
 async def websocket_bridge(websocket: WebSocket):
