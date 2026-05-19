@@ -4,3 +4,5 @@ openai
 pydantic
 python-dotenv
 psutil
+httpx
+websockets
