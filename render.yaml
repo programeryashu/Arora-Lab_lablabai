@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: arora-backend
+    env: docker
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: VITE_AI_API_KEY
+        sync: false
+      - key: VITE_PLANNER_API_KEY
+        sync: false
+      - key: IBM_BOB_API_KEY
+        sync: false
